@@ -1,36 +1,35 @@
 {-# LANGUAGE RecordWildCards, DeriveTraversable, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings, DeriveGeneric, DataKinds, TypeOperators #-}
-import Data.Maybe hiding (mapMaybe)
-import qualified Data.Set as S
-import Data.Set (Set(..))
-import qualified Data.Map as M
-import Data.Map (Map(..))
-import Data.List
 import Control.Arrow
-import qualified Data.Foldable as F
-
+import Control.Monad
+import Control.Monad.Trans.State
+import Data.Aeson hiding ((.:))
+import qualified Data.ByteString.Char8 as BS (isInfixOf)
+import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Either (fromRight)
+import Data.Either.Extra (eitherToMaybe)
+import qualified Data.Foldable as F
+import Data.Function.Pointless
+import Data.Functor.Compose
+import Data.List
+import Data.Map (Map(..))
+import qualified Data.Map as M
+import Data.Maybe hiding (mapMaybe)
+import Data.Proxy
+-- import qualified Data.Sequence as S
+import Data.Set (Set(..))
+import qualified Data.Set as S
+import Debug.Trace
+import GHC.Generics
+import Network.HTTP.Client hiding (Proxy(..), cookieJar)
+import Network.HTTP.Simple hiding (Proxy(..))
+import Safe
 import Servant.API
 import Servant.Client
 import Servant.Client.Core.Request hiding (RequestBodyLBS, requestHeaders, requestBody)
-import GHC.Generics
-import Data.Proxy
-import Data.Aeson hiding ((.:))
-import Network.HTTP.Client hiding (Proxy(..), cookieJar)
-import Network.HTTP.Simple hiding (Proxy(..))
--- import qualified Data.Sequence as S
-import Data.Function.Pointless
-import Data.Either.Extra (eitherToMaybe)
-import Test.QuickCheck
 import System.IO.Unsafe
-import Safe
-import qualified Data.ByteString.Lazy.Char8 as BS
-import qualified Data.ByteString.Char8 as BS (isInfixOf)
-import Debug.Trace
-import Control.Monad.Trans.State
-import Data.Functor.Compose
+import Test.QuickCheck
 import Witherable hiding (filter)
-import Control.Monad
 
 data Axis = I | J | Ellipsis deriving (Eq, Ord, Bounded, Enum, Generic)
 
@@ -51,7 +50,6 @@ instance Arbitrary a => Arbitrary (Composite a) where
 
 instance ToJSON a => ToJSON (Composite a)
 
--- type EinOpsAPI = "/" :> ReqBody '[JSON] (Equation Axis) :> Post '[JSON] [Int]
 type EinOpsAPI = "/" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
 
 newtype EquationStr = EquationStr { eqn :: String } deriving (Generic, Show)
@@ -67,11 +65,10 @@ einOpsRequest = client einOpsAPI
 -- einOps :: Equation Axis -> [Int]
 einOps :: Equation Axis -> Either ClientError [Int]
 -- einOps xs = (fromRight [777]) . unsafePerformIO $ do
-einOps xs = either (Left . findError) (Right . id) . unsafePerformIO $ do
+einOps xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
-    res <- runClientM (einOpsRequest . EquationStr . eqnToStr $ xs) (
+    runClientM (einOpsRequest . EquationStr . eqnToStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
-    return res
 
 flatten :: [Composite a] -> [a]
 flatten = (=<<) F.toList
@@ -94,14 +91,13 @@ eqnToStr :: Show a => Equation a -> String
 eqnToStr (Equation i o) = compsToStr i <> " -> " <> compsToStr o
 
 compsToStr :: Show a => [Composite a] -> String
-compsToStr = intercalate " " . fmap compToStr
+compsToStr = unwords . fmap compToStr
 
 compToStr :: Show a => Composite a -> String
 compToStr (Single x) = show x
-compToStr (Multiple xs) = "(" <> intercalate " " (fmap show xs) <> ")"
+compToStr (Multiple xs) = "(" <> unwords (fmap show xs) <> ")"
 
 -- axesPermutation gives the numbers of flatten output axes
--- axesPermutation :: Ord a => Equation a -> [Int]
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation inp outp) = let
     axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
@@ -117,14 +113,14 @@ rebaseNums xs = let
 -- input axes
 -- TODO: Error handling for two ellipses or ellipsis within composite axis
 ellipsisPositionInLhs :: [Axis] -> Maybe Int
-ellipsisPositionInLhs = fmap fst . listToMaybe . filter (\(_,a) -> a == Ellipsis) . zip [0..]
+ellipsisPositionInLhs = fmap fst . find (\(_,a) -> a == Ellipsis) . zip [0..]
 
 -- inputCompositeAxes returns a list that for each composite axis returns its
 -- tuple of known and unknown axis numbers
 inputCompositeAxes :: Set Int -> [Composite Int] -> [([Int],[Int])]
-inputCompositeAxes known xs = map (
-            partition ((`S.member` known)) . F.toList
-            ) xs
+inputCompositeAxes known = map (
+            partition (`S.member` known) . F.toList
+            )
 
 
 toLists :: [Composite a] -> [[a]]
@@ -175,7 +171,7 @@ remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
 findError :: ClientError -> ClientError
-findError (FailureResponse req resp@Response{..}) = FailureResponse req (resp { Servant.Client.responseBody = BS.unlines . filter ((("einops.EinopsError") `BS.isInfixOf`) . BS.toStrict) . BS.lines $ responseBody })
+findError (FailureResponse req resp@Response{..}) = FailureResponse req (resp { Servant.Client.responseBody = BS.unlines . filter (("einops.EinopsError" `BS.isInfixOf`) . BS.toStrict) . BS.lines $ responseBody })
 
 main :: IO ()
 main = do
