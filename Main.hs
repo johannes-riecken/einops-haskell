@@ -30,20 +30,21 @@ import Servant.API
 import Servant.Client
 import Servant.Client.Core.Request hiding (RequestBodyLBS, requestHeaders, requestBody)
 import System.IO.Unsafe
+import Test.Hspec
 import Test.QuickCheck
 import Witherable hiding (filter)
 
 data Axis = I
     | J
     | Ellipsis
-    | Anon Int -- TODO: Add to Arbitrary instance
+    -- | Anon Int -- TODO: Add to Arbitrary instance and deal with Bounded
     deriving (Eq, Ord, Bounded, Enum, Generic)
 
 instance Show Axis where
     show I = "i"
     show J = "j"
     show Ellipsis = "..."
-    show (Anon x) = show x
+    -- show (Anon x) = show x
 
 instance Arbitrary Axis where
     arbitrary = elements [I, J, Ellipsis]
@@ -70,9 +71,11 @@ einOpsRequest :: EquationStr -> ClientM [Int]
 einOpsRequest = client einOpsAPI
 
 -- einOps :: Equation Axis -> [Int]
-einOps :: Equation Axis -> Either ClientError [Int]
+einOps :: Equation Axis -> Either BS.ByteString [Int]
+-- einOps :: Equation Axis -> Either ClientError [Int]
 -- einOps xs = (fromRight [777]) . unsafePerformIO $ do
 einOps xs = either (Left . findError) Right . unsafePerformIO $ do
+-- einOps xs = unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (einOpsRequest . EquationStr . eqnToStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
@@ -135,6 +138,13 @@ toLists = map F.toList
 
 newtype CC a = CC (Compose [] Composite a) deriving (Functor, Foldable, Traversable)
 
+-- smart constructor
+cc :: [Composite a] -> CC a
+cc = CC . Compose
+
+uncc :: CC a -> [Composite a]
+uncc (CC (Compose x)) = x
+
 instance Filterable CC where
    mapMaybe _ (CC (Compose []))     = CC (Compose [])
    mapMaybe f (CC (Compose (Single x:xs))) =
@@ -162,7 +172,7 @@ errAxis = [Multiple [J, Ellipsis], Single J]
 
 fixup :: Equation Axis -> Equation Axis
 fixup (Equation inp outp) = let
-    inp' = remDupl . remEllFromMult $ inp
+    inp' = uncc . remDupl . cc . remEllFromMult $ inp
     outp' = remEllFromMult outp
     in Equation inp' outp'
 
@@ -177,16 +187,23 @@ remEllFromMult = map (\case
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
-findError :: ClientError -> ClientError
-findError (FailureResponse req resp@Response{..}) = FailureResponse req (resp { Servant.Client.responseBody = BS.unlines . filter (("einops.EinopsError" `BS.isInfixOf`) . BS.toStrict) . BS.lines $ responseBody })
+findError :: ClientError -> BS.ByteString
+findError (UnsupportedContentType req resp@Response{..}) = responseBody
 
 main :: IO ()
 main = do
+    print $ einOps (Equation [Multiple [I,I]] [Multiple [I,I]])
+    -- print $ einOps $ fixup (Equation [Multiple [I]] [Multiple [I]])
+    -- TODO: Create endpoints for all the recipe fields and create unit tests
+    -- for them
+    -- TODO: Create endpoints for rearrange, reduce and repeat
     -- BS.putStrLn $ encode (EquationStr " -> ")
     -- putStrLn . eqnToStr $ Equation iAxis iAxis
     -- putStrLn . eqnToStr $ Equation iAxis ijeAxis
     -- print $ einOps (Equation iAxis iAxis)
-    quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (axesPermutation xs')
+
+--     quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (axesPermutation xs')
+
     -- print $ axesPermutation (fixup $ Equation errAxis errAxis)
     -- print $ (fixup $ Equation errAxis errAxis)
     -- quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (inputCompositeAxes S.empty (input $ xs'))
