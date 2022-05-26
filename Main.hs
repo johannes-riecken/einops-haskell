@@ -12,6 +12,8 @@ import qualified Data.Foldable as F
 import Data.Function.Pointless
 import Data.Functor.Compose
 import Data.List
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Data.Map (Map(..))
 import qualified Data.Map as M
 import Data.Maybe hiding (mapMaybe)
@@ -31,12 +33,17 @@ import System.IO.Unsafe
 import Test.QuickCheck
 import Witherable hiding (filter)
 
-data Axis = I | J | Ellipsis deriving (Eq, Ord, Bounded, Enum, Generic)
+data Axis = I
+    | J
+    | Ellipsis
+    | Anon Int -- TODO: Add to Arbitrary instance
+    deriving (Eq, Ord, Bounded, Enum, Generic)
 
 instance Show Axis where
     show I = "i"
     show J = "j"
     show Ellipsis = "..."
+    show (Anon x) = show x
 
 instance Arbitrary Axis where
     arbitrary = elements [I, J, Ellipsis]
