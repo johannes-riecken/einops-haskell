@@ -10,6 +10,7 @@ import Data.Either (fromRight)
 import Data.Either.Extra (eitherToMaybe)
 import qualified Data.Foldable as F
 import Data.Function.Pointless
+import Data.Functor.Classes
 import Data.Functor.Compose
 import Data.List
 import Data.List.NonEmpty (NonEmpty(..))
@@ -43,7 +44,7 @@ data Axis = I
 instance Show Axis where
     show I = "i"
     show J = "j"
-    show Ellipsis = "..."
+    show Ellipsis = "…"
     -- show (Anon x) = show x
 
 instance Arbitrary Axis where
@@ -173,8 +174,11 @@ errAxis = [Multiple [J, Ellipsis], Single J]
 fixup :: Equation Axis -> Equation Axis
 fixup (Equation inp outp) = let
     inp' = uncc . remDupl . cc . remEllFromMult $ inp
-    outp' = remEllFromMult outp
+    outp' = uncc . remDupl . cc . remEllFromMult $ outp
     in Equation inp' outp'
+
+remDupl' :: [Composite Axis] -> [Composite Axis]
+remDupl' = uncc . remDupl . cc
 
 -- remEllFromMult removes ellipses from Multiples
 remEllFromMult :: [Composite Axis] -> [Composite Axis]
@@ -183,11 +187,29 @@ remEllFromMult = map (\case
     Multiple xs -> Multiple $ filter (/= Ellipsis) xs
     )
 
+checkOneSideIdent :: (Show (f a),Eq (f a),Foldable f) => Equation (f a) -> Either String (Equation (f a))
+checkOneSideIdent (Equation inp outp) = if union inp' outp' == intersect inp' outp' then
+    Right $ Equation inp outp
+    else
+    Left $ "Identifiers only on one side of expression (should be on both): " ++ fmt oneSiders
+    where
+        inp' = F.toList inp
+        outp' = F.toList outp
+        fmt = (\x -> "{" <> x <> "}") . intercalate ", " . map (\x -> "'" <> show x <> "'")
+        oneSiders = if not . null $ inp' \\ outp' then inp' \\ outp' else outp' \\ inp'
+
+checkDuplDim :: Equation Axis -> Either String (Equation Axis)
+checkDuplDim (Equation inp outp) = if inp == remDupl' inp && outp == remDupl' outp
+    then
+    Right $ Equation inp outp
+    else
+    let dup = show $ head ((inp \\ remDupl' inp) ++ (outp \\ remDupl' outp)) in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
+
 
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
-findError :: ClientError -> BS.ByteString
+findError :: ClientError -> BS.ByteString -- TODO: Make Unicode ellipsis (U+2026 display correctly
 findError (UnsupportedContentType req resp@Response{..}) = responseBody
 
 main :: IO ()
@@ -202,7 +224,7 @@ main = do
     -- putStrLn . eqnToStr $ Equation iAxis ijeAxis
     -- print $ einOps (Equation iAxis iAxis)
 
---     quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (axesPermutation xs')
+    quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (axesPermutation xs')
 
     -- print $ axesPermutation (fixup $ Equation errAxis errAxis)
     -- print $ (fixup $ Equation errAxis errAxis)
