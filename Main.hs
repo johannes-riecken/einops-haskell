@@ -44,7 +44,8 @@ data Axis = I
 instance Show Axis where
     show I = "i"
     show J = "j"
-    show Ellipsis = "…"
+    -- show Ellipsis = "…"
+    show Ellipsis = "..."
     -- show (Anon x) = show x
 
 instance Arbitrary Axis where
@@ -97,6 +98,7 @@ instance Arbitrary a => Arbitrary (Equation a) where
         n <- choose (0,10)
         outp <- take n <$> shuffle inp
         pure $ Equation inp outp
+    shrink = genericShrink
 
 instance ToJSON a => ToJSON (Equation a)
 
@@ -202,14 +204,20 @@ checkOneSideIdent (Equation inp outp) = if union inp' outp' == intersect inp' ou
         oneSiders = if not . null $ inp' \\ outp' then inp' \\ outp' else outp' \\ inp'
 
 checkDuplDim :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkDuplDim (Equation inp outp) = if inp == remDupl' inp && outp == remDupl' outp
+checkDuplDim eqn@(Equation inp outp) = if flatten inp == flatten (remDupl' inp) && flatten outp == flatten (remDupl' outp)
     then
     Right $ Equation inp outp
     else
-    let dup = BS.pack . show $ head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
+    let
+        ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) :: Axis
+        dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
+
+checkLeftEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkLeftEllipsis (Equation inp outp) | Ellipsis `elem` flatten inp && Ellipsis `notElem` flatten outp = Left "Ellipsis found in left side, but not right side of a pattern -> (...)"
+checkLeftEllipsis eqn = Right eqn
 
 axesPermutation' :: Equation Axis -> Either BS.ByteString [Int]
-axesPermutation' = fmap axesPermutation . (checkDuplDim <=< checkOneSideIdent)
+axesPermutation' = fmap axesPermutation . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis)
 
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
@@ -236,9 +244,11 @@ main = do
     -- TODO: Create endpoints for all the recipe fields and create unit tests
     -- for them
     -- TODO: Create endpoints for rearrange, reduce and repeat
+    -- TODO: Support underscore axis
 
---     quickCheck $ \xs -> einOps xs === axesPermutation' xs
+    quickCheck $ \xs -> einOps xs === axesPermutation' xs
 
+    -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation Axis)
     -- print $ ellipsisPositionInLhs [I, Ellipsis, J]
     -- print $ ellipsisPositionInLhs [I, J]
     -- print $ inputCompositeAxes S.empty $ fmap (fmap fromEnum) [Single I, Single J]
