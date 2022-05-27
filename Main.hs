@@ -49,6 +49,7 @@ instance Show Axis where
 
 instance Arbitrary Axis where
     arbitrary = elements [I, J, Ellipsis]
+    shrink = genericShrink
 
 instance ToJSON Axis
 
@@ -56,6 +57,7 @@ data Composite a = Single a | Multiple [a] deriving (Functor, Foldable, Traversa
 
 instance Arbitrary a => Arbitrary (Composite a) where
     arbitrary = oneof [Single <$> arbitrary, Multiple <$> arbitrary]
+    shrink = genericShrink
 
 instance ToJSON a => ToJSON (Composite a)
 
@@ -113,7 +115,7 @@ axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation inp outp) = let
     axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
     in
-    trace (show axisNums) $ map (axisNums M.!) $ flatten outp
+    map (axisNums M.!) $ flatten outp
 
 rebaseNums :: [Int] -> [Int]
 rebaseNums xs = let
@@ -187,24 +189,27 @@ remEllFromMult = map (\case
     Multiple xs -> Multiple $ filter (/= Ellipsis) xs
     )
 
-checkOneSideIdent :: (Show (f a),Eq (f a),Foldable f) => Equation (f a) -> Either String (Equation (f a))
+-- checkOneSideIdent :: (Show (f a),Eq (f a),Foldable f) => Equation (f a) -> Either String (Equation (f a))
+checkOneSideIdent :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkOneSideIdent (Equation inp outp) = if union inp' outp' == intersect inp' outp' then
     Right $ Equation inp outp
     else
-    Left $ "Identifiers only on one side of expression (should be on both): " ++ fmt oneSiders
+    Left $ "Identifiers only on one side of expression (should be on both): " <> fmt oneSiders
     where
         inp' = F.toList inp
         outp' = F.toList outp
-        fmt = (\x -> "{" <> x <> "}") . intercalate ", " . map (\x -> "'" <> show x <> "'")
+        fmt = (\x -> "{" <> x <> "}") . BS.intercalate ", " . map (\x -> "'" <> BS.pack (show x) <> "'")
         oneSiders = if not . null $ inp' \\ outp' then inp' \\ outp' else outp' \\ inp'
 
-checkDuplDim :: Equation Axis -> Either String (Equation Axis)
+checkDuplDim :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkDuplDim (Equation inp outp) = if inp == remDupl' inp && outp == remDupl' outp
     then
     Right $ Equation inp outp
     else
-    let dup = show $ head ((inp \\ remDupl' inp) ++ (outp \\ remDupl' outp)) in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
+    let dup = BS.pack . show $ head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
 
+axesPermutation' :: Equation Axis -> Either BS.ByteString [Int]
+axesPermutation' = fmap axesPermutation . (checkDuplDim <=< checkOneSideIdent)
 
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
@@ -214,7 +219,16 @@ findError (UnsupportedContentType req resp@Response{..}) = responseBody
 
 main :: IO ()
 main = do
-    print $ einOps (Equation [Multiple [I,I]] [Multiple [I,I]])
+    hspec $ do
+        it "gets axes permutations for valid equation" $
+            einOps (Equation [Single I, Single J] [Single J, Single I])
+            `shouldBe`
+            axesPermutation' (Equation [Single I, Single J] [Single J, Single I])
+    hspec $ do
+        it "returns error for duplicate dimension" $
+            einOps (Equation [Multiple [I,I]] [Multiple [I,I]])
+            `shouldBe`
+            axesPermutation' (Equation [Multiple [I,I]] [Multiple [I,I]])
     -- print $ einOps $ fixup (Equation [Multiple [I]] [Multiple [I]])
     -- TODO: Create endpoints for all the recipe fields and create unit tests
     -- for them
@@ -224,7 +238,7 @@ main = do
     -- putStrLn . eqnToStr $ Equation iAxis ijeAxis
     -- print $ einOps (Equation iAxis iAxis)
 
-    quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (axesPermutation xs')
+--     quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (axesPermutation xs')
 
     -- print $ axesPermutation (fixup $ Equation errAxis errAxis)
     -- print $ (fixup $ Equation errAxis errAxis)
