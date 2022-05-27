@@ -196,8 +196,8 @@ checkOneSideIdent (Equation inp outp) = if union inp' outp' == intersect inp' ou
     else
     Left $ "Identifiers only on one side of expression (should be on both): " <> fmt oneSiders
     where
-        inp' = F.toList inp
-        outp' = F.toList outp
+        inp' = flatten inp
+        outp' = flatten outp
         fmt = (\x -> "{" <> x <> "}") . BS.intercalate ", " . map (\x -> "'" <> BS.pack (show x) <> "'")
         oneSiders = if not . null $ inp' \\ outp' then inp' \\ outp' else outp' \\ inp'
 
@@ -221,29 +221,24 @@ main :: IO ()
 main = do
     hspec $ do
         it "gets axes permutations for valid equation" $
-            einOps (Equation [Single I, Single J] [Single J, Single I])
-            `shouldBe`
             axesPermutation' (Equation [Single I, Single J] [Single J, Single I])
+            `shouldBe`
+            einOps (Equation [Single I, Single J] [Single J, Single I])
     hspec $ do
         it "returns error for duplicate dimension" $
-            einOps (Equation [Multiple [I,I]] [Multiple [I,I]])
-            `shouldBe`
             axesPermutation' (Equation [Multiple [I,I]] [Multiple [I,I]])
-    -- print $ einOps $ fixup (Equation [Multiple [I]] [Multiple [I]])
+            `shouldBe`
+            einOps (Equation [Multiple [I,I]] [Multiple [I,I]])
+        it "returns error for one side ident" $
+            axesPermutation' (Equation [Single I] [])
+            `shouldBe`
+            einOps (Equation [Single I] [])
     -- TODO: Create endpoints for all the recipe fields and create unit tests
     -- for them
     -- TODO: Create endpoints for rearrange, reduce and repeat
-    -- BS.putStrLn $ encode (EquationStr " -> ")
-    -- putStrLn . eqnToStr $ Equation iAxis iAxis
-    -- putStrLn . eqnToStr $ Equation iAxis ijeAxis
-    -- print $ einOps (Equation iAxis iAxis)
 
---     quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (axesPermutation xs')
+--     quickCheck $ \xs -> einOps xs === axesPermutation' xs
 
-    -- print $ axesPermutation (fixup $ Equation errAxis errAxis)
-    -- print $ (fixup $ Equation errAxis errAxis)
-    -- quickCheck $ \xs -> let xs' = fixup xs in einOps xs' === Right (inputCompositeAxes S.empty (input $ xs'))
-    -- print $ axesPermutation [J, I]
     -- print $ ellipsisPositionInLhs [I, Ellipsis, J]
     -- print $ ellipsisPositionInLhs [I, J]
     -- print $ inputCompositeAxes S.empty $ fmap (fmap fromEnum) [Single I, Single J]
