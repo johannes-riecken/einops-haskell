@@ -62,30 +62,9 @@ instance Arbitrary a => Arbitrary (Composite a) where
 
 instance ToJSON a => ToJSON (Composite a)
 
-type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
-
 newtype EquationStr = EquationStr { eqn :: String } deriving (Generic, Show)
 
 instance ToJSON EquationStr
-
-einOpsAPI :: Proxy AxesPermutationAPI
-einOpsAPI = Proxy
-
-einOpsRequest :: EquationStr -> ClientM [Int]
-einOpsRequest = client einOpsAPI
-
--- axesPermutationPy :: Equation Axis -> [Int]
-axesPermutationPy :: Equation Axis -> Either BS.ByteString [Int]
--- axesPermutationPy :: Equation Axis -> Either ClientError [Int]
--- axesPermutationPy xs = (fromRight [777]) . unsafePerformIO $ do
-axesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
--- axesPermutationPy xs = unsafePerformIO $ do
-    mngr <- newManager defaultManagerSettings
-    runClientM (einOpsRequest . EquationStr . eqnToStr $ xs) (
-        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
-
-flatten :: [Composite a] -> [a]
-flatten = (=<<) F.toList
 
 data Equation a = Equation {
     input :: [Composite a],
@@ -111,6 +90,23 @@ compsToStr = unwords . fmap compToStr
 compToStr :: Show a => Composite a -> String
 compToStr (Single x) = show x
 compToStr (Multiple xs) = "(" <> unwords (fmap show xs) <> ")"
+
+flatten :: [Composite a] -> [a]
+flatten = (=<<) F.toList
+
+type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
+
+axesPermutationAPI :: Proxy AxesPermutationAPI
+axesPermutationAPI = Proxy
+
+axesPermutationRequest :: EquationStr -> ClientM [Int]
+axesPermutationRequest = client axesPermutationAPI
+
+axesPermutationPy :: Equation Axis -> Either BS.ByteString [Int]
+axesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (axesPermutationRequest . EquationStr . eqnToStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
