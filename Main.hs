@@ -108,6 +108,20 @@ axesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
     runClientM (axesPermutationRequest . EquationStr . eqnToStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
+type AddedAxesAPI = "/added_axes" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
+
+addedAxesAPI :: Proxy AddedAxesAPI
+addedAxesAPI = Proxy
+
+addedAxesRequest :: EquationStr -> ClientM [Int]
+addedAxesRequest = client addedAxesAPI
+
+addedAxesPy :: Equation Axis -> Either BS.ByteString [Int]
+addedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (addedAxesRequest . EquationStr . eqnToStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation inp outp) = let
