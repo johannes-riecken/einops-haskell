@@ -62,24 +62,24 @@ instance Arbitrary a => Arbitrary (Composite a) where
 
 instance ToJSON a => ToJSON (Composite a)
 
-type EinOpsAPI = "/" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
+type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
 
 newtype EquationStr = EquationStr { eqn :: String } deriving (Generic, Show)
 
 instance ToJSON EquationStr
 
-einOpsAPI :: Proxy EinOpsAPI
+einOpsAPI :: Proxy AxesPermutationAPI
 einOpsAPI = Proxy
 
 einOpsRequest :: EquationStr -> ClientM [Int]
 einOpsRequest = client einOpsAPI
 
--- einOps :: Equation Axis -> [Int]
-einOps :: Equation Axis -> Either BS.ByteString [Int]
--- einOps :: Equation Axis -> Either ClientError [Int]
--- einOps xs = (fromRight [777]) . unsafePerformIO $ do
-einOps xs = either (Left . findError) Right . unsafePerformIO $ do
--- einOps xs = unsafePerformIO $ do
+-- axesPermutationPy :: Equation Axis -> [Int]
+axesPermutationPy :: Equation Axis -> Either BS.ByteString [Int]
+-- axesPermutationPy :: Equation Axis -> Either ClientError [Int]
+-- axesPermutationPy xs = (fromRight [777]) . unsafePerformIO $ do
+axesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
+-- axesPermutationPy xs = unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (einOpsRequest . EquationStr . eqnToStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
@@ -231,22 +231,22 @@ main = do
         it "gets axes permutations for valid equation" $
             axesPermutation' (Equation [Single I, Single J] [Single J, Single I])
             `shouldBe`
-            einOps (Equation [Single I, Single J] [Single J, Single I])
+            axesPermutationPy (Equation [Single I, Single J] [Single J, Single I])
     hspec $ do
         it "returns error for duplicate dimension" $
             axesPermutation' (Equation [Multiple [I,I]] [Multiple [I,I]])
             `shouldBe`
-            einOps (Equation [Multiple [I,I]] [Multiple [I,I]])
+            axesPermutationPy (Equation [Multiple [I,I]] [Multiple [I,I]])
         it "returns error for one side ident" $
             axesPermutation' (Equation [Single I] [])
             `shouldBe`
-            einOps (Equation [Single I] [])
+            axesPermutationPy (Equation [Single I] [])
     -- TODO: Create endpoints for all the recipe fields and create unit tests
     -- for them
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis
 
-    quickCheck $ \xs -> einOps xs === axesPermutation' xs
+    quickCheck $ \xs -> axesPermutationPy xs === axesPermutation' xs
 
     -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation Axis)
     -- print $ ellipsisPositionInLhs [I, Ellipsis, J]
