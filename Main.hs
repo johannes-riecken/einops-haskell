@@ -94,33 +94,60 @@ compToStr (Multiple xs) = "(" <> unwords (fmap show xs) <> ")"
 flatten :: [Composite a] -> [a]
 flatten = (=<<) F.toList
 
+type AxesPermutationRet = [Int]
+type AddedAxesRet = [Int]
+type EllipsisPositionInLhsRet = Maybe Int
+
 type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
 
 axesPermutationAPI :: Proxy AxesPermutationAPI
 axesPermutationAPI = Proxy
 
-axesPermutationRequest :: EquationStr -> ClientM [Int]
+axesPermutationRequest :: EquationStr -> ClientM AxesPermutationRet
 axesPermutationRequest = client axesPermutationAPI
 
-axesPermutationPy :: Equation Axis -> Either BS.ByteString [Int]
+axesPermutationPy :: Equation Axis -> Either BS.ByteString AxesPermutationRet
 axesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (axesPermutationRequest . EquationStr . eqnToStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type AddedAxesAPI = "/added_axes" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
+axesPermutation' :: Equation Axis -> Either BS.ByteString AxesPermutationRet
+axesPermutation' = fmap axesPermutation . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis)
+
+type AddedAxesAPI = "/added_axes" :> ReqBody '[JSON] EquationStr :> Post '[JSON] AddedAxesRet
 
 addedAxesAPI :: Proxy AddedAxesAPI
 addedAxesAPI = Proxy
 
-addedAxesRequest :: EquationStr -> ClientM [Int]
+addedAxesRequest :: EquationStr -> ClientM AddedAxesRet
 addedAxesRequest = client addedAxesAPI
 
-addedAxesPy :: Equation Axis -> Either BS.ByteString [Int]
+addedAxesPy :: Equation Axis -> Either BS.ByteString AddedAxesRet
 addedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (addedAxesRequest . EquationStr . eqnToStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+addedAxes' :: Equation Axis -> Either BS.ByteString AddedAxesRet
+addedAxes' = fmap addedAxes . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis)
+
+type EllipsisPositionInLhsAPI = "/ellipsis_position_in_lhs" :> ReqBody '[JSON] EquationStr :> Post '[JSON] EllipsisPositionInLhsRet
+
+ellipsisPositionInLhsAPI :: Proxy EllipsisPositionInLhsAPI
+ellipsisPositionInLhsAPI = Proxy
+
+ellipsisPositionInLhsRequest :: EquationStr -> ClientM EllipsisPositionInLhsRet
+ellipsisPositionInLhsRequest = client ellipsisPositionInLhsAPI
+
+ellipsisPositionInLhsPy :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
+ellipsisPositionInLhsPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (ellipsisPositionInLhsRequest . EquationStr . eqnToStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+ellipsisPositionInLhs' :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
+ellipsisPositionInLhs' = fmap ellipsisPositionInLhs . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis)
 
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
@@ -128,6 +155,9 @@ axesPermutation (Equation inp outp) = let
     axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
     in
     map (axisNums M.!) $ flatten outp
+
+addedAxes :: Equation Axis -> [Int]
+addedAxes _ = []  -- TODO: implement
 
 rebaseNums :: [Int] -> [Int]
 rebaseNums xs = let
@@ -137,8 +167,8 @@ rebaseNums xs = let
 -- ellipsisPositionInLhs (for now) gives the ellipsis position in the flattened
 -- input axes
 -- TODO: Error handling for two ellipses or ellipsis within composite axis
-ellipsisPositionInLhs :: [Axis] -> Maybe Int
-ellipsisPositionInLhs = fmap fst . find (\(_,a) -> a == Ellipsis) . zip [0..]
+ellipsisPositionInLhs :: Equation Axis -> Maybe Int
+ellipsisPositionInLhs = fmap fst . find (\(_,a) -> a == Ellipsis) . zip [0..] . flatten . input
 
 -- inputCompositeAxes returns a list that for each composite axis returns its
 -- tuple of known and unknown axis numbers
@@ -226,9 +256,6 @@ checkLeftEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkLeftEllipsis (Equation inp outp) | Ellipsis `elem` flatten inp && Ellipsis `notElem` flatten outp = Left "Ellipsis found in left side, but not right side of a pattern -> (...)"
 checkLeftEllipsis eqn = Right eqn
 
-axesPermutation' :: Equation Axis -> Either BS.ByteString [Int]
-axesPermutation' = fmap axesPermutation . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis)
-
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
@@ -256,7 +283,8 @@ main = do
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis
 
-    quickCheck $ \xs -> axesPermutationPy xs === axesPermutation' xs
+    -- quickCheck $ \xs -> axesPermutationPy xs === axesPermutation' xs
+    quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
 
     -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation Axis)
     -- print $ ellipsisPositionInLhs [I, Ellipsis, J]
