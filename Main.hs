@@ -113,7 +113,7 @@ axesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 axesPermutation' :: Equation Axis -> Either BS.ByteString AxesPermutationRet
-axesPermutation' = fmap axesPermutation . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis)
+axesPermutation' = fmap axesPermutation . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
 type AddedAxesAPI = "/added_axes" :> ReqBody '[JSON] EquationStr :> Post '[JSON] AddedAxesRet
 
@@ -130,7 +130,7 @@ addedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 addedAxes' :: Equation Axis -> Either BS.ByteString AddedAxesRet
-addedAxes' = fmap addedAxes . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis)
+addedAxes' = fmap addedAxes . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
 type EllipsisPositionInLhsAPI = "/ellipsis_position_in_lhs" :> ReqBody '[JSON] EquationStr :> Post '[JSON] EllipsisPositionInLhsRet
 
@@ -147,7 +147,7 @@ ellipsisPositionInLhsPy xs = either (Left . findError) Right . unsafePerformIO $
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 ellipsisPositionInLhs' :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
-ellipsisPositionInLhs' = fmap ellipsisPositionInLhs . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis)
+ellipsisPositionInLhs' = fmap ellipsisPositionInLhs . (checkLeftEllipsis <=< checkOneSideIdent <=< checkDuplDim <=< checkRightEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
@@ -240,8 +240,10 @@ checkOneSideIdent (Equation inp outp) = if union inp' outp' == intersect inp' ou
     where
         inp' = flatten inp
         outp' = flatten outp
-        fmt = (\x -> "{" <> x <> "}") . BS.intercalate ", " . map (\x -> "'" <> BS.pack (show x) <> "'")
+        fmt = (\x -> "{" <> x <> "}") . BS.intercalate ", " . map (\x -> "'" <> BS.pack (f $ show x) <> "'")
         oneSiders = if not . null $ inp' \\ outp' then inp' \\ outp' else outp' \\ inp'
+        f "..." = "\226\128\166"
+        f x = x
 
 checkDuplDim :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkDuplDim eqn@(Equation inp outp) = if flatten inp == flatten (remDupl' inp) && flatten outp == flatten (remDupl' outp)
@@ -252,15 +254,42 @@ checkDuplDim eqn@(Equation inp outp) = if flatten inp == flatten (remDupl' inp) 
         ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) :: Axis
         dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
 
+checkRightDuplDim :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkRightDuplDim eqn@(Equation inp outp) = if flatten outp == flatten (remDupl' outp)
+    then
+    Right eqn
+    else
+    let
+        ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) :: Axis
+        dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
+
 checkLeftEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkLeftEllipsis (Equation inp outp) | Ellipsis `elem` flatten inp && Ellipsis `notElem` flatten outp = Left "Ellipsis found in left side, but not right side of a pattern -> (...)"
+checkLeftEllipsis eqn@(Equation inp outp) | Ellipsis `elem` flatten inp && Ellipsis `notElem` flatten outp = Left $ "Ellipsis found in left side, but not right side of a pattern " <> BS.pack (eqnToStr eqn)
 checkLeftEllipsis eqn = Right eqn
+
+checkRightEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
+-- TODO: Check if latest einops still has this bug
+checkRightEllipsis eqn@(Equation inp outp) | Ellipsis `elem` flatten outp && Ellipsis `notElem` flatten inp = Left $ "Ellipsis found in left side, but not right side of a pattern " <> BS.pack (eqnToStr eqn)
+checkRightEllipsis eqn = Right eqn
+
+checkEllipsisIsParen :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkEllipsisIsParen eqn@(Equation inp outp) | Ellipsis `elem` flatten (filter (\case (Multiple _) -> True; _ -> False) inp) = Left $ "Ellipsis is parenthesis in the left side is not allowed:  " <> BS.pack (eqnToStr eqn)
+checkEllipsisIsParen eqn = Right eqn
+
+checkDuplicateEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkDuplicateEllipsis eqn@(Equation inp outp) | length (filter (==Ellipsis) (flatten inp)) > 1 = Left "Expression may contain dots only inside ellipsis (...); only one ellipsis for tensor "
+checkDuplicateEllipsis eqn = Right eqn
 
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
 findError :: ClientError -> BS.ByteString -- TODO: Make Unicode ellipsis (U+2026 display correctly
 findError (UnsupportedContentType req resp@Response{..}) = responseBody
+
+-- Observed order:
+-- OneSideIdent < LeftEllipsis in EllipsisPositionInLhs
+-- RightEllipsis < OneSideIdent in EllipsisPositionInLhs
+-- DuplDim (on right side) < OneSideIdent in EllipsisPositionInLhs
 
 main :: IO ()
 main = do
@@ -285,6 +314,10 @@ main = do
 
     -- quickCheck $ \xs -> axesPermutationPy xs === axesPermutation' xs
     quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
+    -- let xs = Equation [] [Multiple [Ellipsis]] in
+    --     print $ ellipsisPositionInLhsPy xs
+
+
 
     -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation Axis)
     -- print $ ellipsisPositionInLhs [I, Ellipsis, J]

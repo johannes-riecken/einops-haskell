@@ -57,8 +57,12 @@ def outputCompositeAxes():
 def ellipsisPositionInLhs():
     j = ''
     try:
-        return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                       'rearrange', ()).ellipsis_position_in_lhs)
+        res = _prepare_transformation_recipe(
+                request.json['eqn'],
+                'rearrange', ()).ellipsis_position_in_lhs
+        if res == 10000:
+            res = None
+        return jsonify(res)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
