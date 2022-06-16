@@ -97,8 +97,9 @@ flatten = (=<<) F.toList
 type AxesPermutationRet = [Int]
 type AddedAxesRet = [Int]
 type EllipsisPositionInLhsRet = Maybe Int
+type OutputCompositeAxesRet = [[Int]]
 
-type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] EquationStr :> Post '[JSON] [Int]
+type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] EquationStr :> Post '[JSON] AxesPermutationRet
 
 axesPermutationAPI :: Proxy AxesPermutationAPI
 axesPermutationAPI = Proxy
@@ -149,6 +150,23 @@ ellipsisPositionInLhsPy xs = either (Left . findError) Right . unsafePerformIO $
 ellipsisPositionInLhs' :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
 ellipsisPositionInLhs' = fmap ellipsisPositionInLhs . (checkLeftEllipsis <=< checkOneSideIdent <=< checkDuplDim <=< checkRightEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
+type OutputCompositeAxesAPI = "/output_composite_axes" :> ReqBody '[JSON] EquationStr :> Post '[JSON] OutputCompositeAxesRet
+
+outputCompositeAxesAPI :: Proxy OutputCompositeAxesAPI
+outputCompositeAxesAPI = Proxy
+
+outputCompositeAxesRequest :: EquationStr -> ClientM OutputCompositeAxesRet
+outputCompositeAxesRequest = client outputCompositeAxesAPI
+
+outputCompositeAxesPy :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
+outputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (outputCompositeAxesRequest . EquationStr . eqnToStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+outputCompositeAxes' :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
+outputCompositeAxes' = fmap outputCompositeAxes . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation inp outp) = let
@@ -156,8 +174,15 @@ axesPermutation (Equation inp outp) = let
     in
     map (axisNums M.!) $ flatten outp
 
-addedAxes :: Equation Axis -> [Int]
+-- added axes is apparently not relevant for "rearrange"
+addedAxes :: Equation Axis -> AddedAxesRet
 addedAxes _ = []  -- TODO: implement
+
+outputCompositeAxes :: Equation Axis -> OutputCompositeAxesRet
+outputCompositeAxes eqn@(Equation inp outp) = let
+    axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
+    in
+    map (F.toList . fmap (axisNums M.!)) outp
 
 rebaseNums :: [Int] -> [Int]
 rebaseNums xs = let
@@ -290,6 +315,7 @@ findError (UnsupportedContentType req resp@Response{..}) = responseBody
 -- OneSideIdent < LeftEllipsis in EllipsisPositionInLhs
 -- RightEllipsis < OneSideIdent in EllipsisPositionInLhs
 -- DuplDim (on right side) < OneSideIdent in EllipsisPositionInLhs
+-- LeftEllipsis < OneSideIdent in OutputCompositeAxes
 
 main :: IO ()
 main = do
@@ -307,13 +333,15 @@ main = do
             axesPermutation' (Equation [Single I] [])
             `shouldBe`
             axesPermutationPy (Equation [Single I] [])
-    -- TODO: Create endpoints for all the recipe fields and create unit tests
-    -- for them
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis
 
+    -- PASS
     -- quickCheck $ \xs -> axesPermutationPy xs === axesPermutation' xs
-    quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
+    -- quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
+
+    quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
+
     -- let xs = Equation [] [Multiple [Ellipsis]] in
     --     print $ ellipsisPositionInLhsPy xs
 
