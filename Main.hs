@@ -98,6 +98,7 @@ type AxesPermutationRet = [Int]
 type AddedAxesRet = [Int]
 type EllipsisPositionInLhsRet = Maybe Int
 type OutputCompositeAxesRet = [[Int]]
+type ElementaryAxesLengthsRet = [Maybe Int]
 
 type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] EquationStr :> Post '[JSON] AxesPermutationRet
 
@@ -167,6 +168,23 @@ outputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ d
 outputCompositeAxes' :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
 outputCompositeAxes' = fmap outputCompositeAxes . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
+type ElementaryAxesLengthsAPI = "/elementary_axes_lengths" :> ReqBody '[JSON] EquationStr :> Post '[JSON] ElementaryAxesLengthsRet
+
+elementaryAxesLengthsAPI :: Proxy ElementaryAxesLengthsAPI
+elementaryAxesLengthsAPI = Proxy
+
+elementaryAxesLengthsRequest :: EquationStr -> ClientM ElementaryAxesLengthsRet
+elementaryAxesLengthsRequest = client elementaryAxesLengthsAPI
+
+elementaryAxesLengthsPy :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
+elementaryAxesLengthsPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (elementaryAxesLengthsRequest . EquationStr . eqnToStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+elementaryAxesLengths' :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
+elementaryAxesLengths' = fmap elementaryAxesLengths . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation inp outp) = let
@@ -183,6 +201,9 @@ outputCompositeAxes eqn@(Equation inp outp) = let
     axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
     in
     map (F.toList . fmap (axisNums M.!)) outp
+
+elementaryAxesLengths :: Equation Axis -> ElementaryAxesLengthsRet
+elementaryAxesLengths eqn = []
 
 rebaseNums :: [Int] -> [Int]
 rebaseNums xs = let
@@ -261,7 +282,7 @@ checkOneSideIdent :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkOneSideIdent (Equation inp outp) = if union inp' outp' == intersect inp' outp' then
     Right $ Equation inp outp
     else
-    Left $ "Identifiers only on one side of expression (should be on both): " <> fmt oneSiders
+    Left $ "Identifiers only on one side of expression (should be on both): " <> fmt (sort oneSiders)
     where
         inp' = flatten inp
         outp' = flatten outp
@@ -339,8 +360,9 @@ main = do
     -- PASS
     -- quickCheck $ \xs -> axesPermutationPy xs === axesPermutation' xs
     -- quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
+    -- quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
 
-    quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
+    quickCheck $ \xs -> elementaryAxesLengthsPy xs === elementaryAxesLengths' xs
 
     -- let xs = Equation [] [Multiple [Ellipsis]] in
     --     print $ ellipsisPositionInLhsPy xs

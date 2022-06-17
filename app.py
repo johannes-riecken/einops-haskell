@@ -73,8 +73,15 @@ def ellipsisPositionInLhs():
 def elementaryAxesLengths():
     j = ''
     try:
-        return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                       'rearrange', ()).elementary_axes_lengths)
+        res = _prepare_transformation_recipe(request.json['eqn'],
+                       'rearrange', ()).elementary_axes_lengths
+        res_may = []
+        for x in res:
+            if x == -999999:
+                res_may += [None]
+            else:
+                res_may += [x]
+        return jsonify(res_may)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
