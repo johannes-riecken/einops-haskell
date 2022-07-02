@@ -1,4 +1,5 @@
-from typing import Union
+import traceback
+from typing import Union, Tuple
 
 from einops.einops import _prepare_transformation_recipe
 from flask import Flask, jsonify, request
@@ -71,13 +72,19 @@ def ellipsis_position_in_lhs() -> Union[Response, str]:
 @app.route('/elementary_axes_lengths', methods=['POST'])
 def elementary_axes_lengths() -> Union[Response, str]:
     try:
-        res = _prepare_transformation_recipe(request.json['eqn'],
-                                             'rearrange', ()).elementary_axes_lengths
+        eqn: str = request.json['eqn']
+        axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
+        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        res_tmp = _prepare_transformation_recipe(eqn,
+                                             'rearrange',
+                                                 axes_lengths)
+        res = res_tmp.elementary_axes_lengths
         res_may = []
         for x in res:
             res_may += [None] if x == -999999 else [x]
         return jsonify(res_may)
     except Exception as err:
+        traceback.print_exc()
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j

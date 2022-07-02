@@ -67,8 +67,9 @@ newtype EquationStr = EquationStr { eqn :: String } deriving (Generic, Show)
 instance ToJSON EquationStr
 
 data Equation a = Equation {
-    input :: [Composite a],
-    output :: [Composite a]
+    inp :: [Composite a]
+    , outp :: [Composite a]
+    , axesLengths :: [(a, Int)]
     } deriving (Show, Generic)
 
 instance Arbitrary a => Arbitrary (Equation a) where
@@ -76,13 +77,13 @@ instance Arbitrary a => Arbitrary (Equation a) where
         inp <- arbitrary
         n <- choose (0,10)
         outp <- take n <$> shuffle inp
-        pure $ Equation inp outp
+        pure $ Equation{..}
     shrink = genericShrink
 
 instance ToJSON a => ToJSON (Equation a)
 
 eqnToStr :: Show a => Equation a -> String
-eqnToStr (Equation i o) = compsToStr i <> " -> " <> compsToStr o
+eqnToStr (Equation{..}) = compsToStr inp <> " -> " <> compsToStr outp
 
 compsToStr :: Show a => [Composite a] -> String
 compsToStr = unwords . fmap compToStr
@@ -187,7 +188,7 @@ elementaryAxesLengths' = fmap elementaryAxesLengths . (checkOneSideIdent <=< che
 
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
-axesPermutation (Equation inp outp) = let
+axesPermutation (Equation{..}) = let
     axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
     in
     map (axisNums M.!) $ flatten outp
@@ -197,7 +198,7 @@ addedAxes :: Equation Axis -> AddedAxesRet
 addedAxes _ = []  -- TODO: implement
 
 outputCompositeAxes :: Equation Axis -> OutputCompositeAxesRet
-outputCompositeAxes eqn@(Equation inp outp) = let
+outputCompositeAxes eqn@(Equation{..}) = let
     axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
     in
     map (F.toList . fmap (axisNums M.!)) outp
@@ -214,7 +215,7 @@ rebaseNums xs = let
 -- input axes
 -- TODO: Error handling for two ellipses or ellipsis within composite axis
 ellipsisPositionInLhs :: Equation Axis -> Maybe Int
-ellipsisPositionInLhs = fmap fst . find (\(_,a) -> a == Ellipsis) . zip [0..] . flatten . input
+ellipsisPositionInLhs = fmap fst . find (\(_,a) -> a == Ellipsis) . zip [0..] . flatten . inp
 
 -- inputCompositeAxes returns a list that for each composite axis returns its
 -- tuple of known and unknown axis numbers
@@ -262,10 +263,10 @@ ijeAxis = [Multiple [I,J], Single Ellipsis]
 errAxis = [Multiple [J, Ellipsis], Single J]
 
 fixup :: Equation Axis -> Equation Axis
-fixup (Equation inp outp) = let
+fixup (Equation{..}) = let
     inp' = uncc . remDupl . cc . remEllFromMult $ inp
     outp' = uncc . remDupl . cc . remEllFromMult $ outp
-    in Equation inp' outp'
+    in Equation{inp = inp', outp = outp'}
 
 remDupl' :: [Composite Axis] -> [Composite Axis]
 remDupl' = uncc . remDupl . cc
@@ -279,8 +280,8 @@ remEllFromMult = map (\case
 
 -- checkOneSideIdent :: (Show (f a),Eq (f a),Foldable f) => Equation (f a) -> Either String (Equation (f a))
 checkOneSideIdent :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkOneSideIdent (Equation inp outp) = if union inp' outp' == intersect inp' outp' then
-    Right $ Equation inp outp
+checkOneSideIdent (Equation{..}) = if union inp' outp' == intersect inp' outp' then
+    Right $ Equation{..}
     else
     Left $ "Identifiers only on one side of expression (should be on both): " <> fmt (sort oneSiders)
     where
@@ -292,16 +293,16 @@ checkOneSideIdent (Equation inp outp) = if union inp' outp' == intersect inp' ou
         f x = x
 
 checkDuplDim :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkDuplDim eqn@(Equation inp outp) = if flatten inp == flatten (remDupl' inp) && flatten outp == flatten (remDupl' outp)
+checkDuplDim eqn@(Equation{..}) = if flatten inp == flatten (remDupl' inp) && flatten outp == flatten (remDupl' outp)
     then
-    Right $ Equation inp outp
+    Right $ Equation{..}
     else
     let
         ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) :: Axis
         dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
 
 checkRightDuplDim :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkRightDuplDim eqn@(Equation inp outp) = if flatten outp == flatten (remDupl' outp)
+checkRightDuplDim eqn@(Equation{..}) = if flatten outp == flatten (remDupl' outp)
     then
     Right eqn
     else
@@ -310,20 +311,20 @@ checkRightDuplDim eqn@(Equation inp outp) = if flatten outp == flatten (remDupl'
         dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
 
 checkLeftEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkLeftEllipsis eqn@(Equation inp outp) | Ellipsis `elem` flatten inp && Ellipsis `notElem` flatten outp = Left $ "Ellipsis found in left side, but not right side of a pattern " <> BS.pack (eqnToStr eqn)
+checkLeftEllipsis eqn@(Equation{..}) | Ellipsis `elem` flatten inp && Ellipsis `notElem` flatten outp = Left $ "Ellipsis found in left side, but not right side of a pattern " <> BS.pack (eqnToStr eqn)
 checkLeftEllipsis eqn = Right eqn
 
 checkRightEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
 -- TODO: Check if latest einops still has this bug
-checkRightEllipsis eqn@(Equation inp outp) | Ellipsis `elem` flatten outp && Ellipsis `notElem` flatten inp = Left $ "Ellipsis found in left side, but not right side of a pattern " <> BS.pack (eqnToStr eqn)
+checkRightEllipsis eqn@(Equation{..}) | Ellipsis `elem` flatten outp && Ellipsis `notElem` flatten inp = Left $ "Ellipsis found in left side, but not right side of a pattern " <> BS.pack (eqnToStr eqn)
 checkRightEllipsis eqn = Right eqn
 
 checkEllipsisIsParen :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkEllipsisIsParen eqn@(Equation inp outp) | Ellipsis `elem` flatten (filter (\case (Multiple _) -> True; _ -> False) inp) = Left $ "Ellipsis is parenthesis in the left side is not allowed:  " <> BS.pack (eqnToStr eqn)
+checkEllipsisIsParen eqn@(Equation{..}) | Ellipsis `elem` flatten (filter (\case (Multiple _) -> True; _ -> False) inp) = Left $ "Ellipsis is parenthesis in the left side is not allowed:  " <> BS.pack (eqnToStr eqn)
 checkEllipsisIsParen eqn = Right eqn
 
 checkDuplicateEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkDuplicateEllipsis eqn@(Equation inp outp) | length (filter (==Ellipsis) (flatten inp)) > 1 = Left "Expression may contain dots only inside ellipsis (...); only one ellipsis for tensor "
+checkDuplicateEllipsis eqn@(Equation{..}) | length (filter (==Ellipsis) (flatten inp)) > 1 = Left "Expression may contain dots only inside ellipsis (...); only one ellipsis for tensor "
 checkDuplicateEllipsis eqn = Right eqn
 
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
@@ -342,18 +343,18 @@ main :: IO ()
 main = do
     hspec $ do
         it "gets axes permutations for valid equation" $
-            axesPermutation' (Equation [Single I, Single J] [Single J, Single I])
+            axesPermutation' (Equation {inp = [Single I, Single J], outp = [Single J, Single I]})
             `shouldBe`
-            axesPermutationPy (Equation [Single I, Single J] [Single J, Single I])
+            axesPermutationPy (Equation {inp = [Single I, Single J], outp = [Single J, Single I]})
     hspec $ do
         it "returns error for duplicate dimension" $
-            axesPermutation' (Equation [Multiple [I,I]] [Multiple [I,I]])
+            axesPermutation' (Equation {inp = [Multiple [I,I]], outp = [Multiple [I,I]]})
             `shouldBe`
-            axesPermutationPy (Equation [Multiple [I,I]] [Multiple [I,I]])
+            axesPermutationPy (Equation {inp = [Multiple [I,I]], outp = [Multiple [I,I]]})
         it "returns error for one side ident" $
-            axesPermutation' (Equation [Single I] [])
+            axesPermutation' (Equation {inp = [Single I], outp = []})
             `shouldBe`
-            axesPermutationPy (Equation [Single I] [])
+            axesPermutationPy (Equation {inp = [Single I], outp = []})
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis
 
