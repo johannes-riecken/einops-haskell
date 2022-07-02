@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards, DeriveTraversable, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings, DeriveGeneric, DataKinds, TypeOperators #-}
+{-# LANGUAGE StandaloneDeriving #-}
 import Control.Arrow
 import Control.Monad
 import Control.Monad.Trans.State
@@ -62,9 +63,14 @@ instance Arbitrary a => Arbitrary (Composite a) where
 
 instance ToJSON a => ToJSON (Composite a)
 
-newtype EquationStr = EquationStr { eqn :: String } deriving (Generic, Show)
+data EquationStr a = EquationStr {
+    eqn :: String
+    , axesLengths1 :: [(a,Int)]
+    } deriving (Generic)
 
-instance ToJSON EquationStr
+deriving instance Show a => Show (EquationStr a)
+
+instance ToJSON a => ToJSON (EquationStr a)
 
 data Equation a = Equation {
     inp :: [Composite a]
@@ -77,6 +83,7 @@ instance Arbitrary a => Arbitrary (Equation a) where
         inp <- arbitrary
         n <- choose (0,10)
         outp <- take n <$> shuffle inp
+        axesLengths <- arbitrary
         pure $ Equation{..}
     shrink = genericShrink
 
@@ -84,6 +91,9 @@ instance ToJSON a => ToJSON (Equation a)
 
 eqnToStr :: Show a => Equation a -> String
 eqnToStr (Equation{..}) = compsToStr inp <> " -> " <> compsToStr outp
+
+eqnToEqnStr :: Show a => Equation a -> EquationStr a
+eqnToEqnStr (x@Equation{..}) = EquationStr {eqn = eqnToStr x, axesLengths1 = axesLengths}
 
 compsToStr :: Show a => [Composite a] -> String
 compsToStr = unwords . fmap compToStr
@@ -101,86 +111,86 @@ type EllipsisPositionInLhsRet = Maybe Int
 type OutputCompositeAxesRet = [[Int]]
 type ElementaryAxesLengthsRet = [Maybe Int]
 
-type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] EquationStr :> Post '[JSON] AxesPermutationRet
+type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesPermutationRet
 
 axesPermutationAPI :: Proxy AxesPermutationAPI
 axesPermutationAPI = Proxy
 
-axesPermutationRequest :: EquationStr -> ClientM AxesPermutationRet
+axesPermutationRequest :: (EquationStr Axis) -> ClientM AxesPermutationRet
 axesPermutationRequest = client axesPermutationAPI
 
 axesPermutationPy :: Equation Axis -> Either BS.ByteString AxesPermutationRet
 axesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
-    runClientM (axesPermutationRequest . EquationStr . eqnToStr $ xs) (
+    runClientM (axesPermutationRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 axesPermutation' :: Equation Axis -> Either BS.ByteString AxesPermutationRet
 axesPermutation' = fmap axesPermutation . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
-type AddedAxesAPI = "/added_axes" :> ReqBody '[JSON] EquationStr :> Post '[JSON] AddedAxesRet
+type AddedAxesAPI = "/added_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesRet
 
 addedAxesAPI :: Proxy AddedAxesAPI
 addedAxesAPI = Proxy
 
-addedAxesRequest :: EquationStr -> ClientM AddedAxesRet
+addedAxesRequest :: (EquationStr Axis) -> ClientM AddedAxesRet
 addedAxesRequest = client addedAxesAPI
 
 addedAxesPy :: Equation Axis -> Either BS.ByteString AddedAxesRet
 addedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
-    runClientM (addedAxesRequest . EquationStr . eqnToStr $ xs) (
+    runClientM (addedAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 addedAxes' :: Equation Axis -> Either BS.ByteString AddedAxesRet
 addedAxes' = fmap addedAxes . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
-type EllipsisPositionInLhsAPI = "/ellipsis_position_in_lhs" :> ReqBody '[JSON] EquationStr :> Post '[JSON] EllipsisPositionInLhsRet
+type EllipsisPositionInLhsAPI = "/ellipsis_position_in_lhs" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] EllipsisPositionInLhsRet
 
 ellipsisPositionInLhsAPI :: Proxy EllipsisPositionInLhsAPI
 ellipsisPositionInLhsAPI = Proxy
 
-ellipsisPositionInLhsRequest :: EquationStr -> ClientM EllipsisPositionInLhsRet
+ellipsisPositionInLhsRequest :: (EquationStr Axis) -> ClientM EllipsisPositionInLhsRet
 ellipsisPositionInLhsRequest = client ellipsisPositionInLhsAPI
 
 ellipsisPositionInLhsPy :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
 ellipsisPositionInLhsPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
-    runClientM (ellipsisPositionInLhsRequest . EquationStr . eqnToStr $ xs) (
+    runClientM (ellipsisPositionInLhsRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 ellipsisPositionInLhs' :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
 ellipsisPositionInLhs' = fmap ellipsisPositionInLhs . (checkLeftEllipsis <=< checkOneSideIdent <=< checkDuplDim <=< checkRightEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
-type OutputCompositeAxesAPI = "/output_composite_axes" :> ReqBody '[JSON] EquationStr :> Post '[JSON] OutputCompositeAxesRet
+type OutputCompositeAxesAPI = "/output_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] OutputCompositeAxesRet
 
 outputCompositeAxesAPI :: Proxy OutputCompositeAxesAPI
 outputCompositeAxesAPI = Proxy
 
-outputCompositeAxesRequest :: EquationStr -> ClientM OutputCompositeAxesRet
+outputCompositeAxesRequest :: (EquationStr Axis) -> ClientM OutputCompositeAxesRet
 outputCompositeAxesRequest = client outputCompositeAxesAPI
 
 outputCompositeAxesPy :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
 outputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
-    runClientM (outputCompositeAxesRequest . EquationStr . eqnToStr $ xs) (
+    runClientM (outputCompositeAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 outputCompositeAxes' :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
 outputCompositeAxes' = fmap outputCompositeAxes . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
-type ElementaryAxesLengthsAPI = "/elementary_axes_lengths" :> ReqBody '[JSON] EquationStr :> Post '[JSON] ElementaryAxesLengthsRet
+type ElementaryAxesLengthsAPI = "/elementary_axes_lengths" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ElementaryAxesLengthsRet
 
 elementaryAxesLengthsAPI :: Proxy ElementaryAxesLengthsAPI
 elementaryAxesLengthsAPI = Proxy
 
-elementaryAxesLengthsRequest :: EquationStr -> ClientM ElementaryAxesLengthsRet
+elementaryAxesLengthsRequest :: (EquationStr Axis) -> ClientM ElementaryAxesLengthsRet
 elementaryAxesLengthsRequest = client elementaryAxesLengthsAPI
 
 elementaryAxesLengthsPy :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
 elementaryAxesLengthsPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
-    runClientM (elementaryAxesLengthsRequest . EquationStr . eqnToStr $ xs) (
+    runClientM (elementaryAxesLengthsRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 elementaryAxesLengths' :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
@@ -263,10 +273,10 @@ ijeAxis = [Multiple [I,J], Single Ellipsis]
 errAxis = [Multiple [J, Ellipsis], Single J]
 
 fixup :: Equation Axis -> Equation Axis
-fixup (Equation{..}) = let
+fixup eqn@Equation{..} = let
     inp' = uncc . remDupl . cc . remEllFromMult $ inp
     outp' = uncc . remDupl . cc . remEllFromMult $ outp
-    in Equation{inp = inp', outp = outp'}
+    in eqn{inp = inp', outp = outp'}
 
 remDupl' :: [Composite Axis] -> [Composite Axis]
 remDupl' = uncc . remDupl . cc
@@ -343,18 +353,42 @@ main :: IO ()
 main = do
     hspec $ do
         it "gets axes permutations for valid equation" $
-            axesPermutation' (Equation {inp = [Single I, Single J], outp = [Single J, Single I]})
+            axesPermutation' (Equation {
+                inp = [Single I, Single J]
+                , outp = [Single J, Single I]
+                , axesLengths = []
+                })
             `shouldBe`
-            axesPermutationPy (Equation {inp = [Single I, Single J], outp = [Single J, Single I]})
+            axesPermutationPy (Equation {
+                inp = [Single I, Single J]
+                , outp = [Single J, Single I]
+                , axesLengths = []
+                })
     hspec $ do
         it "returns error for duplicate dimension" $
-            axesPermutation' (Equation {inp = [Multiple [I,I]], outp = [Multiple [I,I]]})
+            axesPermutation' (Equation {
+                inp = [Multiple [I,I]]
+                , outp = [Multiple [I,I]]
+                , axesLengths = []
+                })
             `shouldBe`
-            axesPermutationPy (Equation {inp = [Multiple [I,I]], outp = [Multiple [I,I]]})
+            axesPermutationPy (Equation {
+                inp = [Multiple [I,I]]
+                , outp = [Multiple [I,I]]
+                , axesLengths = []
+                })
         it "returns error for one side ident" $
-            axesPermutation' (Equation {inp = [Single I], outp = []})
+            axesPermutation' (Equation {
+                inp = [Single I]
+                , outp = []
+                , axesLengths = []
+                })
             `shouldBe`
-            axesPermutationPy (Equation {inp = [Single I], outp = []})
+            axesPermutationPy (Equation {
+                inp = [Single I]
+                , outp = []
+                , axesLengths = []
+                })
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis
 
@@ -363,7 +397,7 @@ main = do
     -- quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
     -- quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
 
-    quickCheck $ \xs -> elementaryAxesLengthsPy xs === elementaryAxesLengths' xs
+--     quickCheck $ \xs -> elementaryAxesLengthsPy xs === elementaryAxesLengths' xs
 
     -- let xs = Equation [] [Multiple [Ellipsis]] in
     --     print $ ellipsisPositionInLhsPy xs
