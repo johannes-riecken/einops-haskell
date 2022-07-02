@@ -7,7 +7,7 @@ import Control.Monad.Trans.State
 import Data.Aeson hiding ((.:))
 import qualified Data.ByteString.Char8 as BS (isInfixOf)
 import qualified Data.ByteString.Lazy.Char8 as BS
-import Data.Either (fromRight)
+import Data.Either (isRight, fromRight)
 import Data.Either.Extra (eitherToMaybe)
 import qualified Data.Foldable as F
 import Data.Function.Pointless
@@ -196,7 +196,7 @@ elementaryAxesLengthsPy xs = either (Left . findError) Right . unsafePerformIO $
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 elementaryAxesLengths' :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
-elementaryAxesLengths' = fmap elementaryAxesLengths . (checkOneSideIdent <=< checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+elementaryAxesLengths' = fmap elementaryAxesLengths . (checkDuplDim <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis <=< checkLeftAxisUnused <=< checkLeftEllipsis <=< checkAxisInvalidName <=< checkRightAxisUnused <=< checkOneSideIdent)
 
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
@@ -340,6 +340,22 @@ checkDuplicateEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkDuplicateEllipsis eqn@(Equation{..}) | length (filter (==Ellipsis) (flatten inp)) > 1 = Left "Expression may contain dots only inside ellipsis (...); only one ellipsis for tensor "
 checkDuplicateEllipsis eqn = Right eqn
 
+checkLeftAxisUnused :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkLeftAxisUnused eqn@(Equation{..}) =
+    case find (`notElem` (flatten inp)) (map fst axesLengths) of
+        Just x -> Left $ "Axis " <> BS.pack (show x) <> " is not used in transform"
+        Nothing -> Right eqn
+
+checkRightAxisUnused :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkRightAxisUnused eqn@(Equation{..}) =
+    case find (`notElem` (flatten outp)) (map fst axesLengths) of
+        Just x -> Left $ "Axis " <> BS.pack (show x) <> " is not used in transform"
+        Nothing -> Right eqn
+
+checkAxisInvalidName :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkAxisInvalidName eqn@(Equation{..}) | Ellipsis `elem` map fst axesLengths = Left "('Invalid name for an axis', '...')"
+checkAxisInvalidName eqn = Right eqn
+
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
@@ -400,7 +416,8 @@ main = do
     -- quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
     -- quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
 
-    quickCheck $ \xs -> elementaryAxesLengthsPy xs === elementaryAxesLengths' xs
+    -- print . elementaryAxesLengths' $ (Equation [] [] [(Ellipsis,0)])
+    quickCheck $ \xs -> collect (isRight (elementaryAxesLengths' xs)) $ eitherToMaybe (elementaryAxesLengthsPy xs) === eitherToMaybe (elementaryAxesLengths' xs)
 
     -- let xs = Equation [] [Multiple [Ellipsis]] in
     --     print $ ellipsisPositionInLhsPy xs
