@@ -65,12 +65,14 @@ instance ToJSON a => ToJSON (Composite a)
 
 data EquationStr a = EquationStr {
     eqn :: String
-    , axesLengths1 :: [(a,Int)]
+    , axes_lengths :: [(a,Int)]
     } deriving (Generic)
 
 deriving instance Show a => Show (EquationStr a)
 
-instance ToJSON a => ToJSON (EquationStr a)
+instance (Show a, ToJSON a) => ToJSON (EquationStr a) where
+    toJSON (EquationStr{..}) =
+        object ["eqn" .= eqn, "axes_lengths" .= toJSON (map (first show) axes_lengths)]
 
 data Equation a = Equation {
     inp :: [Composite a]
@@ -93,7 +95,7 @@ eqnToStr :: Show a => Equation a -> String
 eqnToStr (Equation{..}) = compsToStr inp <> " -> " <> compsToStr outp
 
 eqnToEqnStr :: Show a => Equation a -> EquationStr a
-eqnToEqnStr (x@Equation{..}) = EquationStr {eqn = eqnToStr x, axesLengths1 = axesLengths}
+eqnToEqnStr (x@Equation{..}) = EquationStr {eqn = eqnToStr x, axes_lengths = axesLengths}
 
 compsToStr :: Show a => [Composite a] -> String
 compsToStr = unwords . fmap compToStr
@@ -214,7 +216,8 @@ outputCompositeAxes eqn@(Equation{..}) = let
     map (F.toList . fmap (axisNums M.!)) outp
 
 elementaryAxesLengths :: Equation Axis -> ElementaryAxesLengthsRet
-elementaryAxesLengths eqn = []
+elementaryAxesLengths eqn@Equation{..} = let m = M.fromList axesLengths in
+    map (`M.lookup` m) (flatten inp)
 
 rebaseNums :: [Int] -> [Int]
 rebaseNums xs = let
@@ -397,7 +400,7 @@ main = do
     -- quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
     -- quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
 
---     quickCheck $ \xs -> elementaryAxesLengthsPy xs === elementaryAxesLengths' xs
+    quickCheck $ \xs -> elementaryAxesLengthsPy xs === elementaryAxesLengths' xs
 
     -- let xs = Equation [] [Multiple [Ellipsis]] in
     --     print $ ellipsisPositionInLhsPy xs
