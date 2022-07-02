@@ -38,6 +38,8 @@ import Witherable hiding (filter)
 
 data Axis = I
     | J
+    | I0
+    | I1
     | Ellipsis
     -- | Anon Int -- TODO: Add to Arbitrary instance and deal with Bounded
     deriving (Eq, Ord, Bounded, Enum, Generic)
@@ -45,6 +47,8 @@ data Axis = I
 instance Show Axis where
     show I = "i"
     show J = "j"
+    show I0 = "i0"
+    show I1 = "i1"
     -- show Ellipsis = "…"
     show Ellipsis = "..."
     -- show (Anon x) = show x
@@ -408,6 +412,34 @@ main = do
                 , outp = []
                 , axesLengths = []
                 })
+
+    hspec $ do
+        it "calculates elementary axes lengths" $
+            elementaryAxesLengths' (Equation {
+                inp = [Single I, Single J]
+                , outp = [Single J, Single I]
+                , axesLengths = [(I,2)]
+                })
+            `shouldBe`
+            elementaryAxesLengthsPy (Equation {
+                inp = [Single I, Single J]
+                , outp = [Single J, Single I]
+                , axesLengths = [(I,2)]
+                })
+        it "calculates elementary axes lengths for multiples" $
+            elementaryAxesLengths' (Equation {
+                inp = [Multiple [I0,I1], Single J]
+                , outp = [Single I0, Single I1, Single J]
+                , axesLengths = [(I1, 2)]
+                })
+            `shouldBe`
+            elementaryAxesLengthsPy (Equation {
+                inp = [Multiple [I0,I1], Single J]
+                , outp = [Single I0, Single I1, Single J]
+                , axesLengths = [(I1, 2)]
+                })
+
+
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis
 
@@ -417,7 +449,7 @@ main = do
     -- quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
 
     -- print . elementaryAxesLengths' $ (Equation [] [] [(Ellipsis,0)])
-    quickCheck $ \xs -> collect (isRight (elementaryAxesLengths' xs)) $ eitherToMaybe (elementaryAxesLengthsPy xs) === eitherToMaybe (elementaryAxesLengths' xs)
+    -- quickCheck $ \xs -> collect (isRight (elementaryAxesLengths' xs)) $ eitherToMaybe (elementaryAxesLengthsPy xs) === eitherToMaybe (elementaryAxesLengths' xs)
 
     -- let xs = Equation [] [Multiple [Ellipsis]] in
     --     print $ ellipsisPositionInLhsPy xs
