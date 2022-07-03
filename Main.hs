@@ -116,6 +116,7 @@ type AddedAxesRet = [Int]
 type EllipsisPositionInLhsRet = Maybe Int
 type OutputCompositeAxesRet = [[Int]]
 type ElementaryAxesLengthsRet = [Maybe Int]
+type InputCompositeAxesRet = [([Int], [Int])]
 
 type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesPermutationRet
 
@@ -202,6 +203,23 @@ elementaryAxesLengthsPy xs = either (Left . findError) Right . unsafePerformIO $
 elementaryAxesLengths' :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
 elementaryAxesLengths' = fmap elementaryAxesLengths . (checkDuplDim <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis <=< checkLeftAxisUnused <=< checkLeftEllipsis <=< checkAxisInvalidName <=< checkRightAxisUnused <=< checkOneSideIdent)
 
+type InputCompositeAxesAPI = "/input_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InputCompositeAxesRet
+
+inputCompositeAxesAPI :: Proxy InputCompositeAxesAPI
+inputCompositeAxesAPI = Proxy
+
+inputCompositeAxesRequest :: (EquationStr Axis) -> ClientM InputCompositeAxesRet
+inputCompositeAxesRequest = client inputCompositeAxesAPI
+
+inputCompositeAxesPy :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
+inputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (inputCompositeAxesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+inputCompositeAxes' :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
+inputCompositeAxes' = fmap inputCompositeAxes . (checkDuplDim <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis <=< checkLeftAxisUnused <=< checkLeftEllipsis <=< checkAxisInvalidName <=< checkRightAxisUnused <=< checkOneSideIdent)
+
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation{..}) = let
@@ -236,11 +254,14 @@ ellipsisPositionInLhs = fmap fst . find (\(_,a) -> a == Ellipsis) . zip [0..] . 
 
 -- inputCompositeAxes returns a list that for each composite axis returns its
 -- tuple of known and unknown axis numbers
-inputCompositeAxes :: Set Int -> [Composite Int] -> [([Int],[Int])]
-inputCompositeAxes known = map (
-            partition (`S.member` known) . F.toList
-            )
-
+inputCompositeAxes :: Equation Axis -> [([Int],[Int])]
+inputCompositeAxes (eqn@Equation{..}) =
+    let
+        known = S.fromList (fmap ((axisNums M.!) . fst) axesLengths)
+        axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
+        in map (
+            partition (`S.member` known) . (map (axisNums M.!)) . F.toList
+            ) inp
 
 toLists :: [Composite a] -> [[a]]
 toLists = map F.toList
@@ -365,6 +386,7 @@ remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S
 
 findError :: ClientError -> BS.ByteString -- TODO: Make Unicode ellipsis (U+2026 display correctly
 findError (UnsupportedContentType req resp@Response{..}) = responseBody
+findError x = error (show x)
 
 -- Observed order:
 -- OneSideIdent < LeftEllipsis in EllipsisPositionInLhs
@@ -439,6 +461,31 @@ main = do
                 , axesLengths = [(I1, 2)]
                 })
 
+    hspec $ do
+        it "calculates input composite axes" $
+            inputCompositeAxes' (Equation {
+                inp = [Multiple [I0,I1], Single J]
+                , outp = [Single I0, Single I1, Single J]
+                , axesLengths = [(I1, 2)]
+                })
+            `shouldBe`
+            inputCompositeAxesPy (Equation {
+                inp = [Multiple [I0,I1], Single J]
+                , outp = [Single I0, Single I1, Single J]
+                , axesLengths = [(I1, 2)]
+                })
+        it "calculates more composite axes" $
+            inputCompositeAxes' (Equation {
+                inp = [Single J, Multiple [I0]]
+                , outp = [Single I0, Single J]
+                , axesLengths = [(I0, 2)]
+                })
+            `shouldBe`
+            inputCompositeAxesPy (Equation {
+                inp = [Single J, Multiple [I0]]
+                , outp = [Single I0, Single J]
+                , axesLengths = [(I0, 2)]
+                })
 
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis

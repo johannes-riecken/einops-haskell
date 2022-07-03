@@ -93,8 +93,10 @@ def elementary_axes_lengths() -> Union[Response, str]:
 @app.route('/input_composite_axes', methods=['POST'])
 def input_composite_axes() -> Union[Response, str]:
     try:
+        axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
+        axes_lengths = tuple([tuple(x) for x in axes_lengths])
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      'rearrange', ()).input_composite_axes)
+                                                      'rearrange', axes_lengths).input_composite_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
