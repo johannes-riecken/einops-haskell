@@ -99,7 +99,7 @@ eqnToStr :: Show a => Equation a -> String
 eqnToStr (Equation{..}) = compsToStr inp <> " -> " <> compsToStr outp
 
 eqnToEqnStr :: Show a => Equation a -> EquationStr a
-eqnToEqnStr (x@Equation{..}) = EquationStr {eqn = eqnToStr x, axes_lengths = axesLengths}
+eqnToEqnStr x@Equation{..} = EquationStr {eqn = eqnToStr x, axes_lengths = axesLengths}
 
 compsToStr :: Show a => [Composite a] -> String
 compsToStr = unwords . fmap compToStr
@@ -123,7 +123,7 @@ type AxesPermutationAPI = "/axes_permutation" :> ReqBody '[JSON] (EquationStr Ax
 axesPermutationAPI :: Proxy AxesPermutationAPI
 axesPermutationAPI = Proxy
 
-axesPermutationRequest :: (EquationStr Axis) -> ClientM AxesPermutationRet
+axesPermutationRequest :: EquationStr Axis -> ClientM AxesPermutationRet
 axesPermutationRequest = client axesPermutationAPI
 
 axesPermutationPy :: Equation Axis -> Either BS.ByteString AxesPermutationRet
@@ -140,7 +140,7 @@ type AddedAxesAPI = "/added_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post 
 addedAxesAPI :: Proxy AddedAxesAPI
 addedAxesAPI = Proxy
 
-addedAxesRequest :: (EquationStr Axis) -> ClientM AddedAxesRet
+addedAxesRequest :: EquationStr Axis -> ClientM AddedAxesRet
 addedAxesRequest = client addedAxesAPI
 
 addedAxesPy :: Equation Axis -> Either BS.ByteString AddedAxesRet
@@ -157,7 +157,7 @@ type EllipsisPositionInLhsAPI = "/ellipsis_position_in_lhs" :> ReqBody '[JSON] (
 ellipsisPositionInLhsAPI :: Proxy EllipsisPositionInLhsAPI
 ellipsisPositionInLhsAPI = Proxy
 
-ellipsisPositionInLhsRequest :: (EquationStr Axis) -> ClientM EllipsisPositionInLhsRet
+ellipsisPositionInLhsRequest :: EquationStr Axis -> ClientM EllipsisPositionInLhsRet
 ellipsisPositionInLhsRequest = client ellipsisPositionInLhsAPI
 
 ellipsisPositionInLhsPy :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
@@ -174,7 +174,7 @@ type OutputCompositeAxesAPI = "/output_composite_axes" :> ReqBody '[JSON] (Equat
 outputCompositeAxesAPI :: Proxy OutputCompositeAxesAPI
 outputCompositeAxesAPI = Proxy
 
-outputCompositeAxesRequest :: (EquationStr Axis) -> ClientM OutputCompositeAxesRet
+outputCompositeAxesRequest :: EquationStr Axis -> ClientM OutputCompositeAxesRet
 outputCompositeAxesRequest = client outputCompositeAxesAPI
 
 outputCompositeAxesPy :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
@@ -191,7 +191,7 @@ type ElementaryAxesLengthsAPI = "/elementary_axes_lengths" :> ReqBody '[JSON] (E
 elementaryAxesLengthsAPI :: Proxy ElementaryAxesLengthsAPI
 elementaryAxesLengthsAPI = Proxy
 
-elementaryAxesLengthsRequest :: (EquationStr Axis) -> ClientM ElementaryAxesLengthsRet
+elementaryAxesLengthsRequest :: EquationStr Axis -> ClientM ElementaryAxesLengthsRet
 elementaryAxesLengthsRequest = client elementaryAxesLengthsAPI
 
 elementaryAxesLengthsPy :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
@@ -208,7 +208,7 @@ type InputCompositeAxesAPI = "/input_composite_axes" :> ReqBody '[JSON] (Equatio
 inputCompositeAxesAPI :: Proxy InputCompositeAxesAPI
 inputCompositeAxesAPI = Proxy
 
-inputCompositeAxesRequest :: (EquationStr Axis) -> ClientM InputCompositeAxesRet
+inputCompositeAxesRequest :: EquationStr Axis -> ClientM InputCompositeAxesRet
 inputCompositeAxesRequest = client inputCompositeAxesAPI
 
 inputCompositeAxesPy :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
@@ -230,6 +230,9 @@ axesPermutation (Equation{..}) = let
 -- added axes is apparently not relevant for "rearrange"
 addedAxes :: Equation Axis -> AddedAxesRet
 addedAxes _ = []  -- TODO: implement
+
+-- reducedElementaryAxes is apparently not relevant for "rearrange"
+-- TODO: implement
 
 outputCompositeAxes :: Equation Axis -> OutputCompositeAxesRet
 outputCompositeAxes eqn@(Equation{..}) = let
@@ -255,12 +258,12 @@ ellipsisPositionInLhs = fmap fst . find (\(_,a) -> a == Ellipsis) . zip [0..] . 
 -- inputCompositeAxes returns a list that for each composite axis returns its
 -- tuple of known and unknown axis numbers
 inputCompositeAxes :: Equation Axis -> [([Int],[Int])]
-inputCompositeAxes (eqn@Equation{..}) =
+inputCompositeAxes eqn@Equation{..} =
     let
         known = S.fromList (fmap ((axisNums M.!) . fst) axesLengths)
         axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
         in map (
-            partition (`S.member` known) . (map (axisNums M.!)) . F.toList
+            partition (`S.member` known) . map (axisNums M.!) . F.toList
             ) inp
 
 toLists :: [Composite a] -> [[a]]
@@ -367,13 +370,13 @@ checkDuplicateEllipsis eqn = Right eqn
 
 checkLeftAxisUnused :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkLeftAxisUnused eqn@(Equation{..}) =
-    case find (`notElem` (flatten inp)) (map fst axesLengths) of
+    case find (`notElem` flatten inp) (map fst axesLengths) of
         Just x -> Left $ "Axis " <> BS.pack (show x) <> " is not used in transform"
         Nothing -> Right eqn
 
 checkRightAxisUnused :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkRightAxisUnused eqn@(Equation{..}) =
-    case find (`notElem` (flatten outp)) (map fst axesLengths) of
+    case find (`notElem` flatten outp) (map fst axesLengths) of
         Just x -> Left $ "Axis " <> BS.pack (show x) <> " is not used in transform"
         Nothing -> Right eqn
 
