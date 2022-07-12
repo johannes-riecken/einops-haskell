@@ -21,45 +21,45 @@ def handle_exception(e: HTTPException) -> Response:
     return response
 
 
-@app.route('/axes_permutation', methods=['POST'])
-def axes_permutation() -> Union[Response, str]:
+@app.route('/<action>/axes_permutation', methods=['POST'])
+def axes_permutation(action: str) -> Union[Response, str]:
     try:
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      'rearrange', ()).axes_permutation)
+                                                      action, ()).axes_permutation)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
 
 
-@app.route('/added_axes', methods=['POST'])
-def added_axes() -> Union[Response, str]:
+@app.route('/<action>/added_axes', methods=['POST'])
+def added_axes(action: str) -> Union[Response, str]:
     try:
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      'rearrange', ()).added_axes)
+                                                      action, ()).added_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
 
 
-@app.route('/output_composite_axes', methods=['POST'])
-def output_composite_axes() -> Union[Response, str]:
+@app.route('/<action>/output_composite_axes', methods=['POST'])
+def output_composite_axes(action: str) -> Union[Response, str]:
     try:
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      'rearrange', ()).output_composite_axes)
+                                                      action, ()).output_composite_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
 
 
-@app.route('/ellipsis_position_in_lhs', methods=['POST'])
-def ellipsis_position_in_lhs() -> Union[Response, str]:
+@app.route('/<action>/ellipsis_position_in_lhs', methods=['POST'])
+def ellipsis_position_in_lhs(action: str) -> Union[Response, str]:
     try:
         res = _prepare_transformation_recipe(
             request.json['eqn'],
-            'rearrange', ()).ellipsis_position_in_lhs
+            action, ()).ellipsis_position_in_lhs
         if res == 10000:
             res = None
         return jsonify(res)
@@ -69,14 +69,14 @@ def ellipsis_position_in_lhs() -> Union[Response, str]:
     return j
 
 
-@app.route('/elementary_axes_lengths', methods=['POST'])
-def elementary_axes_lengths() -> Union[Response, str]:
+@app.route('/<action>/elementary_axes_lengths', methods=['POST'])
+def elementary_axes_lengths(action: str) -> Union[Response, str]:
     try:
         eqn: str = request.json['eqn']
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
         axes_lengths = tuple([tuple(x) for x in axes_lengths])
         res_tmp = _prepare_transformation_recipe(eqn,
-                                             'rearrange',
+                                                 action,
                                                  axes_lengths)
         res = res_tmp.elementary_axes_lengths
         res_may = []
@@ -90,25 +90,28 @@ def elementary_axes_lengths() -> Union[Response, str]:
     return j
 
 
-@app.route('/input_composite_axes', methods=['POST'])
-def input_composite_axes() -> Union[Response, str]:
+@app.route('/<action>/input_composite_axes', methods=['POST'])
+def input_composite_axes(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
         axes_lengths = tuple([tuple(x) for x in axes_lengths])
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      'rearrange', axes_lengths).input_composite_axes)
+                                                      action, axes_lengths).input_composite_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
 
 
-@app.route('/reduced_elementary_axes', methods=['POST'])
-def reduced_elementary_axes() -> Union[Response, str]:
+@app.route('/<action>/reduced_elementary_axes', methods=['POST'])
+def reduced_elementary_axes(action: str) -> Union[Response, str]:
     try:
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      'rearrange', ()).reduced_elementary_axes)
+                                                      action, ()).reduced_elementary_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
+
+# init_shapes, reduced_axes, axes_reordering, added_axes, final_shapes
+# _reconstruct_from_shape(recipe, backend.shape(tensor))
