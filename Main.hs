@@ -1,8 +1,12 @@
 {-# LANGUAGE RecordWildCards, DeriveTraversable, LambdaCase #-}
 {-# LANGUAGE OverloadedStrings, DeriveGeneric, DataKinds, TypeOperators #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
 import Control.Arrow
 import Control.Monad
+import Control.Monad.Free
 import Control.Monad.Trans.State
 import Data.Aeson hiding ((.:))
 import qualified Data.ByteString.Char8 as BS (isInfixOf)
@@ -10,9 +14,13 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Either (isRight, fromRight)
 import Data.Either.Extra (eitherToMaybe)
 import qualified Data.Foldable as F
+import Data.Tensor
 import Data.Function.Pointless
 import Data.Functor.Classes
 import Data.Functor.Compose
+import Data.Functor.Identity
+import Data.Functor.Sum
+import Data.Kind
 import Data.List
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
@@ -25,6 +33,8 @@ import Data.Set (Set(..))
 import qualified Data.Set as S
 import Debug.Trace
 import GHC.Generics
+import GHC.TypeLits
+import Iso.Deriving
 import Network.HTTP.Client hiding (Proxy(..), cookieJar)
 import Network.HTTP.Simple hiding (Proxy(..))
 import Safe
@@ -124,6 +134,7 @@ type EllipsisPositionInLhsRet = Maybe Int
 type OutputCompositeAxesRet = [[Int]]
 type ElementaryAxesLengthsRet = [Maybe Int]
 type InputCompositeAxesRet = [([Int], [Int])]
+type ReducedElementaryAxesRet = [Int]
 
 type RearrangeAxesPermutationAPI = "/rearrange/axes_permutation" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesPermutationRet
 type ReduceAxesPermutationAPI = "/reduce/axes_permutation" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesPermutationRet
@@ -426,12 +437,18 @@ axesPermutation (Equation{..}) = let
     in
     map (axisNums M.!) $ flatten outp
 
--- added axes is apparently not relevant for "rearrange"
+-- addedAxes given equation returns a map from axes numbers to repeat counts
+-- Example: addedAxes "h w -> h w 3" is {2: 3}
+-- TODO: Add integer type to Axis datatype
 addedAxes :: Equation Axis -> AddedAxesRet
 addedAxes _ = []  -- TODO: implement
 
--- reducedElementaryAxes is apparently not relevant for "rearrange"
--- TODO: implement
+-- example: reducedElementaryAxes "h w -> h" "max" is [1]
+reducedElementaryAxes :: (Show a,Ord a) => Equation a -> ReducedElementaryAxesRet
+reducedElementaryAxes (Equation{..}) = let
+    axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
+    in
+    map (axisNums M.!) $ flatten outp \\ flatten inp
 
 outputCompositeAxes :: Equation Axis -> OutputCompositeAxesRet
 outputCompositeAxes eqn@(Equation{..}) = let
@@ -687,6 +704,19 @@ main = do
                 inp = [Single J, Multiple [I0]]
                 , outp = [Single I0, Single J]
                 , axesLengths = [(I0, 2)]
+                })
+    hspec $ do
+        it "calculates reduced elementary axes" $
+            reduceReducedElementaryAxes' (Equation {
+                inp = [Single I, Single J]
+                , outp = [Single I]
+                , axesLengths = []
+                })
+            `shouldBe`
+            reduceReducedElementaryAxesPy (Equation {
+                inp = [Single I, Single J]
+                , outp = [Single I]
+                , axesLengths = []
                 })
 
     -- TODO: Create endpoints for rearrange, reduce and repeat

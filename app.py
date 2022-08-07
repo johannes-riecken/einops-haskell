@@ -69,6 +69,7 @@ def ellipsis_position_in_lhs(action: str) -> Union[Response, str]:
     return j
 
 
+# TODO: allow other reductions than max
 @app.route('/<action>/elementary_axes_lengths', methods=['POST'])
 def elementary_axes_lengths(action: str) -> Union[Response, str]:
     try:
@@ -76,7 +77,7 @@ def elementary_axes_lengths(action: str) -> Union[Response, str]:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
         axes_lengths = tuple([tuple(x) for x in axes_lengths])
         res_tmp = _prepare_transformation_recipe(eqn,
-                                                 action,
+                                                 'max',
                                                  axes_lengths)
         res = res_tmp.elementary_axes_lengths
         res_may = []
