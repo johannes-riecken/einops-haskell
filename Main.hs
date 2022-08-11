@@ -430,15 +430,18 @@ repeatInputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformI
 repeatInputCompositeAxes' :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
 repeatInputCompositeAxes' = fmap inputCompositeAxes . (checkDuplDim <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis <=< checkLeftAxisUnused <=< checkLeftEllipsis <=< checkAxisInvalidName <=< checkRightAxisUnused <=< checkOneSideIdent)
 
+axisNumsFromCompList :: Ord a => [Composite a] -> M.Map a Int
+axisNumsFromCompList = snd . foldl' (\(i,acc) x ->
+        if M.member x acc then (i,acc) else
+        (i+1,M.insertWith (\a b -> error "no duplicates allowed") x i acc))
+        (0,M.empty) . cc
+
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation{..}) = let
-    axisNums = snd . foldl' (\(i,acc) x ->
-        if M.member x acc then (i,acc) else
-        (i+1,M.insertWith (\a b -> error "no duplicates allowed") x i acc))
-        (0,M.empty) . cc $ inp
+    axisNums = axisNumsFromCompList inp
     in
-    map (axisNums M.!) $ flatten outp
+    foldr ((:) . (axisNums M.!)) [] . cc $ outp
 
 -- addedAxes given equation returns a map from axes numbers to repeat counts
 -- Example: addedAxes "h w -> h w 3" is {2: 3}
@@ -449,38 +452,36 @@ addedAxes _ = []  -- TODO: implement
 -- example: reducedElementaryAxes "h w -> h" "max" is [1]
 reducedElementaryAxes :: (Show a,Ord a) => Equation a -> ReducedElementaryAxesRet
 reducedElementaryAxes (Equation{..}) = let
-    axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
+    axisNums = axisNumsFromCompList inp
     in
     map (axisNums M.!) $ flatten outp \\ flatten inp
 
 outputCompositeAxes :: Equation Axis -> OutputCompositeAxesRet
 outputCompositeAxes eqn@(Equation{..}) = let
-    axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
+    axisNums = axisNumsFromCompList inp
     in
     map (F.toList . fmap (axisNums M.!)) outp
 
 elementaryAxesLengths :: Equation Axis -> ElementaryAxesLengthsRet
 elementaryAxesLengths eqn@Equation{..} = let m = M.fromList axesLengths in
-    map (`M.lookup` m) (flatten inp)
-
-rebaseNums :: [Int] -> [Int]
-rebaseNums xs = let
-    h = M.fromList $ zip (sort xs) [0..]
-    in map (h M.!) xs
+    foldr ((:) . (`M.lookup` m)) [] . cc $ inp
 
 -- ellipsisPositionInLhs (for now) gives the ellipsis position in the flattened
 -- input axes
 -- TODO: Error handling for two ellipses or ellipsis within composite axis
 ellipsisPositionInLhs :: Equation Axis -> Maybe Int
-ellipsisPositionInLhs = fmap fst . find (\(_,a) -> a == Ellipsis) . zip [0..] . flatten . inp
+ellipsisPositionInLhs xs = let inp' = inp xs in
+    fmap fst . listToMaybe . snd .
+    foldr (\x (i,acc) -> if x == Single Ellipsis then (i+1,(i,x):acc) else (i+1,acc))
+        (length inp' - 1, []) $ inp'
 
 -- inputCompositeAxes returns a list that for each composite axis returns its
 -- tuple of known and unknown axis numbers
 inputCompositeAxes :: Equation Axis -> [([Int],[Int])]
 inputCompositeAxes eqn@Equation{..} =
     let
+        axisNums = axisNumsFromCompList inp
         known = S.fromList (fmap ((axisNums M.!) . fst) axesLengths)
-        axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
         in map (
             partition (`S.member` known) . map (axisNums M.!) . F.toList
             ) inp
