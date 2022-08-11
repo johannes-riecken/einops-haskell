@@ -14,7 +14,7 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Either (isRight, fromRight)
 import Data.Either.Extra (eitherToMaybe)
 import qualified Data.Foldable as F
-import Data.Tensor
+import Data.Tensor hiding (select)
 import Data.Function.Pointless
 import Data.Functor.Classes
 import Data.Functor.Compose
@@ -475,6 +475,11 @@ ellipsisPositionInLhs xs = let inp' = inp xs in
     foldr (\x (i,acc) -> if x == Single Ellipsis then (i+1,(i,x):acc) else (i+1,acc))
         (length inp' - 1, []) $ inp'
 
+-- unexported helper from Data.List
+select :: (a -> Bool) -> a -> ([a], [a]) -> ([a], [a])
+select p x ~(ts,fs) | p x       = (x:ts,fs)
+                    | otherwise = (ts, x:fs)
+
 -- inputCompositeAxes returns a list that for each composite axis returns its
 -- tuple of known and unknown axis numbers
 inputCompositeAxes :: Equation Axis -> [([Int],[Int])]
@@ -483,7 +488,7 @@ inputCompositeAxes eqn@Equation{..} =
         axisNums = axisNumsFromCompList inp
         known = S.fromList (fmap ((axisNums M.!) . fst) axesLengths)
         in map (
-            partition (`S.member` known) . map (axisNums M.!) . F.toList
+            foldr (select (`S.member` known) . (axisNums M.!)) ([],[])
             ) inp
 
 toLists :: [Composite a] -> [[a]]
