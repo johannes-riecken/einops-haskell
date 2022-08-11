@@ -433,7 +433,10 @@ repeatInputCompositeAxes' = fmap inputCompositeAxes . (checkDuplDim <=< checkEll
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation{..}) = let
-    axisNums = M.fromList $ (`zip` [0..]) $ flatten inp
+    axisNums = snd . foldl' (\(i,acc) x ->
+        if M.member x acc then (i,acc) else
+        (i+1,M.insertWith (\a b -> error "no duplicates allowed") x i acc))
+        (0,M.empty) . cc $ inp
     in
     map (axisNums M.!) $ flatten outp
 
@@ -705,19 +708,19 @@ main = do
                 , outp = [Single I0, Single J]
                 , axesLengths = [(I0, 2)]
                 })
-    hspec $ do
-        it "calculates reduced elementary axes" $
-            reduceReducedElementaryAxes' (Equation {
-                inp = [Single I, Single J]
-                , outp = [Single I]
-                , axesLengths = []
-                })
-            `shouldBe`
-            reduceReducedElementaryAxesPy (Equation {
-                inp = [Single I, Single J]
-                , outp = [Single I]
-                , axesLengths = []
-                })
+    -- hspec $ do
+    --     it "calculates reduced elementary axes" $
+    --         reduceReducedElementaryAxes' (Equation {
+    --             inp = [Single I, Single J]
+    --             , outp = [Single I]
+    --             , axesLengths = []
+    --             })
+    --         `shouldBe`
+    --         reduceReducedElementaryAxesPy (Equation {
+    --             inp = [Single I, Single J]
+    --             , outp = [Single I]
+    --             , axesLengths = []
+    --             })
 
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis
