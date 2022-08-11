@@ -491,9 +491,6 @@ inputCompositeAxes eqn@Equation{..} =
             foldr (select (`S.member` known) . (axisNums M.!)) ([],[])
             ) inp
 
-toLists :: [Composite a] -> [[a]]
-toLists = map F.toList
-
 newtype CC a = CC (Compose [] Composite a) deriving (Functor, Foldable, Traversable)
 
 -- smart constructor
@@ -533,6 +530,9 @@ fixup eqn@Equation{..} = let
     inp' = uncc . remDupl . cc . remEllFromMult $ inp
     outp' = uncc . remDupl . cc . remEllFromMult $ outp
     in eqn{inp = inp', outp = outp'}
+
+remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
+remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
 remDupl' :: [Composite Axis] -> [Composite Axis]
 remDupl' = uncc . remDupl . cc
@@ -608,9 +608,6 @@ checkRightAxisUnused eqn@(Equation{..}) =
 checkAxisInvalidName :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkAxisInvalidName eqn@(Equation{..}) | Ellipsis `elem` map fst axesLengths = Left "('Invalid name for an axis', '...')"
 checkAxisInvalidName eqn = Right eqn
-
-remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
-remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
 findError :: ClientError -> BS.ByteString -- TODO: Make Unicode ellipsis (U+2026 display correctly
 findError (UnsupportedContentType req resp@Response{..}) = responseBody
