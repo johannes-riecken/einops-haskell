@@ -1,10 +1,12 @@
 from typing import Union, Tuple
 
-from einops.einops import _prepare_transformation_recipe
+from einops.einops import _prepare_transformation_recipe, _reconstruct_from_shape
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.sansio.response import Response
+import numpy as np
 
+ims = np.reshape(np.fromfile('/Users/rieckenj/repos/einops-haskell/out.bin', dtype='byte'), (6, 4, 4, 3))
 app = Flask(__name__)
 
 
@@ -119,5 +121,94 @@ def reduced_elementary_axes(action: str) -> Union[Response, str]:
         j = f'{err}'
     return j
 
-# init_shapes, reduced_axes, axes_reordering, added_axes, final_shapes
-# _reconstruct_from_shape(recipe, backend.shape(tensor))
+
+reconstruct_fields = {
+    "init_shapes": 0,
+    "reduced_axes": 1,
+    "axes_reordering": 2,
+    "added_axes_reconstruct": 3,
+    "final_shapes": 4,
+}
+
+
+# _reconstruct_from_shape BEGIN
+@app.route('/<action>/init_shapes', methods=['POST'])
+def init_shapes(action: str) -> Union[Response, str]:
+    try:
+        axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
+        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        recipe = _prepare_transformation_recipe(request.json['eqn'],
+                                                'max' if action == 'reduce' else action,
+                                                axes_lengths)
+        return jsonify(_reconstruct_from_shape(recipe,
+                                               ims.shape)[reconstruct_fields['init_shapes']])
+    except Exception as err:
+        print(f'unexpected {err}, {type(err)}')
+        j = f'{err}'
+    return j
+
+
+@app.route('/<action>/reduced_axes', methods=['POST'])
+def reduced_axes(action: str) -> Union[Response, str]:
+    try:
+        axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
+        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        recipe = _prepare_transformation_recipe(request.json['eqn'],
+                                                'max' if action == 'reduce' else action,
+                                                axes_lengths)
+        return jsonify(_reconstruct_from_shape(recipe,
+                                               ims.shape)[reconstruct_fields['reduced_axes']])
+    except Exception as err:
+        print(f'unexpected {err}, {type(err)}')
+        j = f'{err}'
+    return j
+
+
+@app.route('/<action>/axes_reordering', methods=['POST'])
+def axes_reordering(action: str) -> Union[Response, str]:
+    try:
+        axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
+        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        recipe = _prepare_transformation_recipe(request.json['eqn'],
+                                                'max' if action == 'reduce' else action,
+                                                axes_lengths)
+        return jsonify(_reconstruct_from_shape(recipe,
+                                               ims.shape)[reconstruct_fields['axes_reordering']])
+    except Exception as err:
+        print(f'unexpected {err}, {type(err)}')
+        j = f'{err}'
+    return j
+
+
+@app.route('/<action>/added_axes_reconstruct', methods=['POST'])
+def added_axes_reconstruct(action: str) -> Union[Response, str]:
+    try:
+        axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
+        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        recipe = _prepare_transformation_recipe(request.json['eqn'],
+                                                'max' if action == 'reduce' else action,
+                                                axes_lengths)
+        return jsonify(_reconstruct_from_shape(recipe,
+                                               ims.shape)[reconstruct_fields['added_axes_reconstruct']])
+    except Exception as err:
+        print(f'unexpected {err}, {type(err)}')
+        j = f'{err}'
+    return j
+
+
+@app.route('/<action>/final_shapes', methods=['POST'])
+def final_shapes(action: str) -> Union[Response, str]:
+    try:
+        axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
+        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        recipe = _prepare_transformation_recipe(request.json['eqn'],
+                                                'max' if action == 'reduce' else action,
+                                                axes_lengths)
+        return jsonify(_reconstruct_from_shape(recipe,
+                                               ims.shape)[reconstruct_fields['final_shapes']])
+    except Exception as err:
+        print(f'unexpected {err}, {type(err)}')
+        j = f'{err}'
+    return j
+
+# _reconstruct_from_shape END
