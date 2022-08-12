@@ -143,7 +143,7 @@ type ReducedElementaryAxesRet = [Int]
 type InitShapesRet = [Int]
 type ReducedAxesRet = [Int]
 type AxesReorderingRet = [Int]
-type AddedAxesReconstructRet = [Int]
+type AddedAxesReconstructRet = Map Int Int
 type FinalShapesRet = [Int]
 
 -- AUTOGEN BEGIN
@@ -600,50 +600,50 @@ repeatAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ 
     runClientM (repeatAxesReorderingRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- addedAxesReconstruct' :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
--- addedAxesReconstruct' = fmap addedAxesReconstruct . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+addedAxesReconstruct' :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+addedAxesReconstruct' = fmap addedAxesReconstruct . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
--- type RearrangeAddedAxesReconstructAPI = "/rearrange/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+type RearrangeAddedAxesReconstructAPI = "/rearrange/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
 
--- rearrangeAddedAxesReconstructAPI :: Proxy RearrangeAddedAxesReconstructAPI
--- rearrangeAddedAxesReconstructAPI = Proxy
+rearrangeAddedAxesReconstructAPI :: Proxy RearrangeAddedAxesReconstructAPI
+rearrangeAddedAxesReconstructAPI = Proxy
 
--- rearrangeAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
--- rearrangeAddedAxesReconstructRequest = client rearrangeAddedAxesReconstructAPI
+rearrangeAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+rearrangeAddedAxesReconstructRequest = client rearrangeAddedAxesReconstructAPI
 
--- rearrangeAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
--- rearrangeAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (rearrangeAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+rearrangeAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+rearrangeAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (rearrangeAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- type ReduceAddedAxesReconstructAPI = "/reduce/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+type ReduceAddedAxesReconstructAPI = "/reduce/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
 
--- reduceAddedAxesReconstructAPI :: Proxy ReduceAddedAxesReconstructAPI
--- reduceAddedAxesReconstructAPI = Proxy
+reduceAddedAxesReconstructAPI :: Proxy ReduceAddedAxesReconstructAPI
+reduceAddedAxesReconstructAPI = Proxy
 
--- reduceAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
--- reduceAddedAxesReconstructRequest = client reduceAddedAxesReconstructAPI
+reduceAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+reduceAddedAxesReconstructRequest = client reduceAddedAxesReconstructAPI
 
--- reduceAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
--- reduceAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (reduceAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+reduceAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+reduceAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (reduceAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- type RepeatAddedAxesReconstructAPI = "/repeat/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+type RepeatAddedAxesReconstructAPI = "/repeat/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
 
--- repeatAddedAxesReconstructAPI :: Proxy RepeatAddedAxesReconstructAPI
--- repeatAddedAxesReconstructAPI = Proxy
+repeatAddedAxesReconstructAPI :: Proxy RepeatAddedAxesReconstructAPI
+repeatAddedAxesReconstructAPI = Proxy
 
--- repeatAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
--- repeatAddedAxesReconstructRequest = client repeatAddedAxesReconstructAPI
+repeatAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+repeatAddedAxesReconstructRequest = client repeatAddedAxesReconstructAPI
 
--- repeatAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
--- repeatAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (repeatAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+repeatAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+repeatAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (repeatAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 -- finalShapes' :: Equation Axis -> Either BS.ByteString FinalShapesRet
 -- finalShapes' = fmap finalShapes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
@@ -760,11 +760,17 @@ inputCompositeAxes eqn@Equation{..} =
 initShapes :: Equation Axis -> InitShapesRet
 initShapes _ = [6,4,4,3]
 
+-- TODO: remove
 reducedAxes :: Equation Axis -> ReducedAxesRet
 reducedAxes = reducedElementaryAxes
 
+-- TODO: remove
 axesReordering :: Equation Axis -> AxesReorderingRet
 axesReordering = axesPermutation
+
+-- TODO: implement
+addedAxesReconstruct :: Equation Axis -> AddedAxesReconstructRet
+addedAxesReconstruct _ = M.empty
 
 -- end of business logic
 
@@ -1040,6 +1046,20 @@ main = do
                 })
             `shouldBe`
             rearrangeAxesReorderingPy (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
+
+    hspec $ do
+        it "calculates added axes for reconstruct" $
+            addedAxesReconstruct' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            rearrangeAddedAxesReconstructPy (Equation {
                 inp = [Single B, Single H, Single W, Single C]
                 , outp = [Single H, Single B, Single W, Single C]
                 , axesLengths = []
