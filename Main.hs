@@ -140,6 +140,12 @@ type ElementaryAxesLengthsRet = [Maybe Int]
 type InputCompositeAxesRet = [([Int], [Int])]
 type ReducedElementaryAxesRet = [Int]
 
+type InitShapesRet = [Int]
+type ReducedAxesRet = [Int]
+type AxesReorderingRet = [Int]
+type AddedAxesReconstructRet = [Int]
+type FinalShapesRet = [Int]
+
 -- AUTOGEN BEGIN
 addedAxes' :: Equation Axis -> Either BS.ByteString AddedAxesRet
 addedAxes' = fmap addedAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
@@ -456,9 +462,237 @@ repeatReducedElementaryAxesPy xs = either (Left . findError) Right . unsafePerfo
     runClientM (repeatReducedElementaryAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-
-
 -- AUTOGEN END
+
+-- RECONSTRUCT AUTOGEN BEGIN
+initShapes' :: Equation Axis -> Either BS.ByteString InitShapesRet
+initShapes' = fmap initShapes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+
+type RearrangeInitShapesAPI = "/rearrange/init_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InitShapesRet
+
+rearrangeInitShapesAPI :: Proxy RearrangeInitShapesAPI
+rearrangeInitShapesAPI = Proxy
+
+rearrangeInitShapesRequest :: EquationStr Axis -> ClientM InitShapesRet
+rearrangeInitShapesRequest = client rearrangeInitShapesAPI
+
+rearrangeInitShapesPy :: Equation Axis -> Either BS.ByteString InitShapesRet
+rearrangeInitShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (rearrangeInitShapesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+type ReduceInitShapesAPI = "/reduce/init_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InitShapesRet
+
+reduceInitShapesAPI :: Proxy ReduceInitShapesAPI
+reduceInitShapesAPI = Proxy
+
+reduceInitShapesRequest :: EquationStr Axis -> ClientM InitShapesRet
+reduceInitShapesRequest = client reduceInitShapesAPI
+
+reduceInitShapesPy :: Equation Axis -> Either BS.ByteString InitShapesRet
+reduceInitShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (reduceInitShapesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+type RepeatInitShapesAPI = "/repeat/init_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InitShapesRet
+
+repeatInitShapesAPI :: Proxy RepeatInitShapesAPI
+repeatInitShapesAPI = Proxy
+
+repeatInitShapesRequest :: EquationStr Axis -> ClientM InitShapesRet
+repeatInitShapesRequest = client repeatInitShapesAPI
+
+repeatInitShapesPy :: Equation Axis -> Either BS.ByteString InitShapesRet
+repeatInitShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (repeatInitShapesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- reducedAxes' :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+-- reducedAxes' = fmap reducedAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+
+-- type RearrangeReducedAxesAPI = "/rearrange/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+
+-- rearrangeReducedAxesAPI :: Proxy RearrangeReducedAxesAPI
+-- rearrangeReducedAxesAPI = Proxy
+
+-- rearrangeReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+-- rearrangeReducedAxesRequest = client rearrangeReducedAxesAPI
+
+-- rearrangeReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+-- rearrangeReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (rearrangeReducedAxesRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- type ReduceReducedAxesAPI = "/reduce/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+
+-- reduceReducedAxesAPI :: Proxy ReduceReducedAxesAPI
+-- reduceReducedAxesAPI = Proxy
+
+-- reduceReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+-- reduceReducedAxesRequest = client reduceReducedAxesAPI
+
+-- reduceReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+-- reduceReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (reduceReducedAxesRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- type RepeatReducedAxesAPI = "/repeat/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+
+-- repeatReducedAxesAPI :: Proxy RepeatReducedAxesAPI
+-- repeatReducedAxesAPI = Proxy
+
+-- repeatReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+-- repeatReducedAxesRequest = client repeatReducedAxesAPI
+
+-- repeatReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+-- repeatReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (repeatReducedAxesRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- axesReordering' :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+-- axesReordering' = fmap axesReordering . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+
+-- type RearrangeAxesReorderingAPI = "/rearrange/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+
+-- rearrangeAxesReorderingAPI :: Proxy RearrangeAxesReorderingAPI
+-- rearrangeAxesReorderingAPI = Proxy
+
+-- rearrangeAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+-- rearrangeAxesReorderingRequest = client rearrangeAxesReorderingAPI
+
+-- rearrangeAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+-- rearrangeAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (rearrangeAxesReorderingRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- type ReduceAxesReorderingAPI = "/reduce/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+
+-- reduceAxesReorderingAPI :: Proxy ReduceAxesReorderingAPI
+-- reduceAxesReorderingAPI = Proxy
+
+-- reduceAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+-- reduceAxesReorderingRequest = client reduceAxesReorderingAPI
+
+-- reduceAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+-- reduceAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (reduceAxesReorderingRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- type RepeatAxesReorderingAPI = "/repeat/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+
+-- repeatAxesReorderingAPI :: Proxy RepeatAxesReorderingAPI
+-- repeatAxesReorderingAPI = Proxy
+
+-- repeatAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+-- repeatAxesReorderingRequest = client repeatAxesReorderingAPI
+
+-- repeatAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+-- repeatAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (repeatAxesReorderingRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- addedAxesReconstruct' :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+-- addedAxesReconstruct' = fmap addedAxesReconstruct . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+
+-- type RearrangeAddedAxesReconstructAPI = "/rearrange/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+
+-- rearrangeAddedAxesReconstructAPI :: Proxy RearrangeAddedAxesReconstructAPI
+-- rearrangeAddedAxesReconstructAPI = Proxy
+
+-- rearrangeAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+-- rearrangeAddedAxesReconstructRequest = client rearrangeAddedAxesReconstructAPI
+
+-- rearrangeAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+-- rearrangeAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (rearrangeAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- type ReduceAddedAxesReconstructAPI = "/reduce/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+
+-- reduceAddedAxesReconstructAPI :: Proxy ReduceAddedAxesReconstructAPI
+-- reduceAddedAxesReconstructAPI = Proxy
+
+-- reduceAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+-- reduceAddedAxesReconstructRequest = client reduceAddedAxesReconstructAPI
+
+-- reduceAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+-- reduceAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (reduceAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- type RepeatAddedAxesReconstructAPI = "/repeat/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+
+-- repeatAddedAxesReconstructAPI :: Proxy RepeatAddedAxesReconstructAPI
+-- repeatAddedAxesReconstructAPI = Proxy
+
+-- repeatAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+-- repeatAddedAxesReconstructRequest = client repeatAddedAxesReconstructAPI
+
+-- repeatAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+-- repeatAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (repeatAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- finalShapes' :: Equation Axis -> Either BS.ByteString FinalShapesRet
+-- finalShapes' = fmap finalShapes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+
+-- type RearrangeFinalShapesAPI = "/rearrange/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+
+-- rearrangeFinalShapesAPI :: Proxy RearrangeFinalShapesAPI
+-- rearrangeFinalShapesAPI = Proxy
+
+-- rearrangeFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+-- rearrangeFinalShapesRequest = client rearrangeFinalShapesAPI
+
+-- rearrangeFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+-- rearrangeFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (rearrangeFinalShapesRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- type ReduceFinalShapesAPI = "/reduce/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+
+-- reduceFinalShapesAPI :: Proxy ReduceFinalShapesAPI
+-- reduceFinalShapesAPI = Proxy
+
+-- reduceFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+-- reduceFinalShapesRequest = client reduceFinalShapesAPI
+
+-- reduceFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+-- reduceFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (reduceFinalShapesRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+-- type RepeatFinalShapesAPI = "/repeat/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+
+-- repeatFinalShapesAPI :: Proxy RepeatFinalShapesAPI
+-- repeatFinalShapesAPI = Proxy
+
+-- repeatFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+-- repeatFinalShapesRequest = client repeatFinalShapesAPI
+
+-- repeatFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+-- repeatFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+--     mngr <- newManager defaultManagerSettings
+--     runClientM (repeatFinalShapesRequest . eqnToEqnStr $ xs) (
+--         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+
+
+
+-- RECONSTRUCT AUTOGEN END
 
 
 axisNumsFromCompList :: Ord a => [Composite a] -> M.Map a Int
@@ -522,6 +756,12 @@ inputCompositeAxes eqn@Equation{..} =
             foldr (select (`S.member` known) . (axisNums M.!)) ([],[])
             ) inp
 
+-- TODO: Implement
+initShapes :: Equation Axis -> InitShapesRet
+initShapes _ = [6,4,4,3]
+
+-- end of business logic
+
 newtype CC a = CC (Compose [] Composite a) deriving (Functor, Foldable, Traversable)
 
 -- smart constructor
@@ -545,16 +785,6 @@ instance Filterable CC where
      r  -> CC $ Compose $ Multiple r:rs
 
 instance Witherable CC
-
-emptyAxis :: [Composite Axis]
-emptyAxis = []
-
-iAxis :: [Composite Axis]
-iAxis = [Single B]
-
-ijeAxis = [Multiple [B,H], Single Ellipsis]
-
-errAxis = [Multiple [H, Ellipsis], Single H]
 
 fixup :: Equation Axis -> Equation Axis
 fixup eqn@Equation{..} = let
@@ -650,6 +880,16 @@ findError x = error (show x)
 -- RightEllipsis < OneSideIdent in EllipsisPositionInLhs
 -- DuplDim (on right side) < OneSideIdent in EllipsisPositionInLhs
 -- LeftEllipsis < OneSideIdent in OutputCompositeAxes
+
+emptyAxis :: [Composite Axis]
+emptyAxis = []
+
+iAxis :: [Composite Axis]
+iAxis = [Single B]
+
+ijeAxis = [Multiple [B,H], Single Ellipsis]
+
+errAxis = [Multiple [H, Ellipsis], Single H]
 
 main :: IO ()
 main = do
@@ -755,6 +995,19 @@ main = do
             reduceReducedElementaryAxesPy (Equation {
                 inp = [Single B, Single H]
                 , outp = [Single B]
+                , axesLengths = []
+                })
+    hspec $ do
+        it "calculates init shapes" $
+            initShapes' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            rearrangeInitShapesPy (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
                 , axesLengths = []
                 })
 
