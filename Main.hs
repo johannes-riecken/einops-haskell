@@ -541,64 +541,64 @@ reduceReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     runClientM (reduceReducedAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- type RepeatReducedAxesAPI = "/repeat/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+type RepeatReducedAxesAPI = "/repeat/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
 
--- repeatReducedAxesAPI :: Proxy RepeatReducedAxesAPI
--- repeatReducedAxesAPI = Proxy
+repeatReducedAxesAPI :: Proxy RepeatReducedAxesAPI
+repeatReducedAxesAPI = Proxy
 
--- repeatReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
--- repeatReducedAxesRequest = client repeatReducedAxesAPI
+repeatReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+repeatReducedAxesRequest = client repeatReducedAxesAPI
 
--- repeatReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
--- repeatReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (repeatReducedAxesRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+repeatReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+repeatReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (repeatReducedAxesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- axesReordering' :: Equation Axis -> Either BS.ByteString AxesReorderingRet
--- axesReordering' = fmap axesReordering . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+axesReordering' :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+axesReordering' = fmap axesReordering . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
--- type RearrangeAxesReorderingAPI = "/rearrange/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+type RearrangeAxesReorderingAPI = "/rearrange/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
 
--- rearrangeAxesReorderingAPI :: Proxy RearrangeAxesReorderingAPI
--- rearrangeAxesReorderingAPI = Proxy
+rearrangeAxesReorderingAPI :: Proxy RearrangeAxesReorderingAPI
+rearrangeAxesReorderingAPI = Proxy
 
--- rearrangeAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
--- rearrangeAxesReorderingRequest = client rearrangeAxesReorderingAPI
+rearrangeAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+rearrangeAxesReorderingRequest = client rearrangeAxesReorderingAPI
 
--- rearrangeAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
--- rearrangeAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (rearrangeAxesReorderingRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+rearrangeAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+rearrangeAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (rearrangeAxesReorderingRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- type ReduceAxesReorderingAPI = "/reduce/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+type ReduceAxesReorderingAPI = "/reduce/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
 
--- reduceAxesReorderingAPI :: Proxy ReduceAxesReorderingAPI
--- reduceAxesReorderingAPI = Proxy
+reduceAxesReorderingAPI :: Proxy ReduceAxesReorderingAPI
+reduceAxesReorderingAPI = Proxy
 
--- reduceAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
--- reduceAxesReorderingRequest = client reduceAxesReorderingAPI
+reduceAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+reduceAxesReorderingRequest = client reduceAxesReorderingAPI
 
--- reduceAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
--- reduceAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (reduceAxesReorderingRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+reduceAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+reduceAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (reduceAxesReorderingRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- type RepeatAxesReorderingAPI = "/repeat/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+type RepeatAxesReorderingAPI = "/repeat/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
 
--- repeatAxesReorderingAPI :: Proxy RepeatAxesReorderingAPI
--- repeatAxesReorderingAPI = Proxy
+repeatAxesReorderingAPI :: Proxy RepeatAxesReorderingAPI
+repeatAxesReorderingAPI = Proxy
 
--- repeatAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
--- repeatAxesReorderingRequest = client repeatAxesReorderingAPI
+repeatAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+repeatAxesReorderingRequest = client repeatAxesReorderingAPI
 
--- repeatAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
--- repeatAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (repeatAxesReorderingRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+repeatAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+repeatAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (repeatAxesReorderingRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 -- addedAxesReconstruct' :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
 -- addedAxesReconstruct' = fmap addedAxesReconstruct . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
@@ -762,6 +762,9 @@ initShapes _ = [6,4,4,3]
 
 reducedAxes :: Equation Axis -> ReducedAxesRet
 reducedAxes = reducedElementaryAxes
+
+axesReordering :: Equation Axis -> AxesReorderingRet
+axesReordering = axesPermutation
 
 -- end of business logic
 
@@ -1028,6 +1031,19 @@ main = do
                 , axesLengths = []
                 })
 
+    hspec $ do
+        it "calculates axes reordering" $
+            axesReordering' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            rearrangeAxesReorderingPy (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
     -- TODO: Create endpoints for rearrange, reduce and repeat
     -- TODO: Support underscore axis
 
