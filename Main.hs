@@ -510,36 +510,36 @@ repeatInitShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     runClientM (repeatInitShapesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- reducedAxes' :: Equation Axis -> Either BS.ByteString ReducedAxesRet
--- reducedAxes' = fmap reducedAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+reducedAxes' :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+reducedAxes' = fmap reducedAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
--- type RearrangeReducedAxesAPI = "/rearrange/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+type RearrangeReducedAxesAPI = "/rearrange/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
 
--- rearrangeReducedAxesAPI :: Proxy RearrangeReducedAxesAPI
--- rearrangeReducedAxesAPI = Proxy
+rearrangeReducedAxesAPI :: Proxy RearrangeReducedAxesAPI
+rearrangeReducedAxesAPI = Proxy
 
--- rearrangeReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
--- rearrangeReducedAxesRequest = client rearrangeReducedAxesAPI
+rearrangeReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+rearrangeReducedAxesRequest = client rearrangeReducedAxesAPI
 
--- rearrangeReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
--- rearrangeReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (rearrangeReducedAxesRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+rearrangeReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+rearrangeReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (rearrangeReducedAxesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- type ReduceReducedAxesAPI = "/reduce/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+type ReduceReducedAxesAPI = "/reduce/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
 
--- reduceReducedAxesAPI :: Proxy ReduceReducedAxesAPI
--- reduceReducedAxesAPI = Proxy
+reduceReducedAxesAPI :: Proxy ReduceReducedAxesAPI
+reduceReducedAxesAPI = Proxy
 
--- reduceReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
--- reduceReducedAxesRequest = client reduceReducedAxesAPI
+reduceReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+reduceReducedAxesRequest = client reduceReducedAxesAPI
 
--- reduceReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
--- reduceReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (reduceReducedAxesRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+reduceReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+reduceReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (reduceReducedAxesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 -- type RepeatReducedAxesAPI = "/repeat/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
 
@@ -759,6 +759,9 @@ inputCompositeAxes eqn@Equation{..} =
 -- TODO: Implement
 initShapes :: Equation Axis -> InitShapesRet
 initShapes _ = [6,4,4,3]
+
+reducedAxes :: Equation Axis -> ReducedAxesRet
+reducedAxes = reducedElementaryAxes
 
 -- end of business logic
 
@@ -1006,6 +1009,20 @@ main = do
                 })
             `shouldBe`
             rearrangeInitShapesPy (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
+
+    hspec $ do
+        it "calculates reduced axes" $
+            reducedAxes' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            reduceReducedAxesPy (Equation {
                 inp = [Single B, Single H, Single W, Single C]
                 , outp = [Single H, Single B, Single W, Single C]
                 , axesLengths = []
