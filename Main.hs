@@ -46,6 +46,8 @@ import Test.Hspec
 import Test.QuickCheck
 import Witherable hiding (filter)
 
+sampleShape = [6,4,4,3]
+
 data Axis = B
     | H
     | W
@@ -645,50 +647,50 @@ repeatAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerfor
     runClientM (repeatAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- finalShapes' :: Equation Axis -> Either BS.ByteString FinalShapesRet
--- finalShapes' = fmap finalShapes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+finalShapes' :: Equation Axis -> Either BS.ByteString FinalShapesRet
+finalShapes' = fmap finalShapes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
 
--- type RearrangeFinalShapesAPI = "/rearrange/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+type RearrangeFinalShapesAPI = "/rearrange/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
 
--- rearrangeFinalShapesAPI :: Proxy RearrangeFinalShapesAPI
--- rearrangeFinalShapesAPI = Proxy
+rearrangeFinalShapesAPI :: Proxy RearrangeFinalShapesAPI
+rearrangeFinalShapesAPI = Proxy
 
--- rearrangeFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
--- rearrangeFinalShapesRequest = client rearrangeFinalShapesAPI
+rearrangeFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+rearrangeFinalShapesRequest = client rearrangeFinalShapesAPI
 
--- rearrangeFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
--- rearrangeFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (rearrangeFinalShapesRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+rearrangeFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+rearrangeFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (rearrangeFinalShapesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- type ReduceFinalShapesAPI = "/reduce/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+type ReduceFinalShapesAPI = "/reduce/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
 
--- reduceFinalShapesAPI :: Proxy ReduceFinalShapesAPI
--- reduceFinalShapesAPI = Proxy
+reduceFinalShapesAPI :: Proxy ReduceFinalShapesAPI
+reduceFinalShapesAPI = Proxy
 
--- reduceFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
--- reduceFinalShapesRequest = client reduceFinalShapesAPI
+reduceFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+reduceFinalShapesRequest = client reduceFinalShapesAPI
 
--- reduceFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
--- reduceFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (reduceFinalShapesRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+reduceFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+reduceFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (reduceFinalShapesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
--- type RepeatFinalShapesAPI = "/repeat/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+type RepeatFinalShapesAPI = "/repeat/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
 
--- repeatFinalShapesAPI :: Proxy RepeatFinalShapesAPI
--- repeatFinalShapesAPI = Proxy
+repeatFinalShapesAPI :: Proxy RepeatFinalShapesAPI
+repeatFinalShapesAPI = Proxy
 
--- repeatFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
--- repeatFinalShapesRequest = client repeatFinalShapesAPI
+repeatFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+repeatFinalShapesRequest = client repeatFinalShapesAPI
 
--- repeatFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
--- repeatFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
---     mngr <- newManager defaultManagerSettings
---     runClientM (repeatFinalShapesRequest . eqnToEqnStr $ xs) (
---         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
+repeatFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+repeatFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
+    mngr <- newManager defaultManagerSettings
+    runClientM (repeatFinalShapesRequest . eqnToEqnStr $ xs) (
+        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 
 
@@ -771,6 +773,9 @@ axesReordering = axesPermutation
 -- TODO: implement
 addedAxesReconstruct :: Equation Axis -> AddedAxesReconstructRet
 addedAxesReconstruct _ = M.empty
+
+finalShapes :: Equation Axis -> FinalShapesRet
+finalShapes eqn = map (sampleShape !!) (axesPermutation eqn)
 
 -- end of business logic
 
@@ -931,7 +936,7 @@ main = do
                 , outp = [Multiple [B,B]]
                 , axesLengths = []
                 })
-        -- -- this fails because B've taken the check out for now
+        -- -- this fails because I've taken the check out for now
         -- it "returns error for one side ident" $
         --     axesPermutation' (Equation {
         --         inp = [Single B]
@@ -1060,6 +1065,19 @@ main = do
                 })
             `shouldBe`
             rearrangeAddedAxesReconstructPy (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
+    hspec $ do
+        it "calculates final shapes" $
+            finalShapes' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Single B, Single W, Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            rearrangeFinalShapesPy (Equation {
                 inp = [Single B, Single H, Single W, Single C]
                 , outp = [Single H, Single B, Single W, Single C]
                 , axesLengths = []
