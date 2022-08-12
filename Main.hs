@@ -46,10 +46,12 @@ import Test.Hspec
 import Test.QuickCheck
 import Witherable hiding (filter)
 
-data Axis = I
-    | J
-    | I0
-    | I1
+data Axis = B
+    | H
+    | W
+    | C
+    | I
+    | T
     | Ellipsis
     -- | Anon Int -- TODO: Add to Arbitrary instance and deal with Bounded
     deriving (Eq, Ord, Bounded, Enum, Generic)
@@ -62,16 +64,18 @@ data Action =
     deriving (Eq, Ord, Show)
 
 instance Show Axis where
+    show B = "b"
+    show H = "h"
+    show W = "w"
+    show C = "c"
     show I = "i"
-    show J = "j"
-    show I0 = "i0"
-    show I1 = "i1"
+    show T = "t"
     -- show Ellipsis = "…"
     show Ellipsis = "..."
     -- show (Anon x) = show x
 
 instance Arbitrary Axis where
-    arbitrary = elements [I, J, Ellipsis]
+    arbitrary = elements [B, H, Ellipsis]
     shrink = genericShrink
 
 instance ToJSON Axis
@@ -546,11 +550,11 @@ emptyAxis :: [Composite Axis]
 emptyAxis = []
 
 iAxis :: [Composite Axis]
-iAxis = [Single I]
+iAxis = [Single B]
 
-ijeAxis = [Multiple [I,J], Single Ellipsis]
+ijeAxis = [Multiple [B,H], Single Ellipsis]
 
-errAxis = [Multiple [J, Ellipsis], Single J]
+errAxis = [Multiple [H, Ellipsis], Single H]
 
 fixup :: Equation Axis -> Equation Axis
 fixup eqn@Equation{..} = let
@@ -652,39 +656,39 @@ main = do
     hspec $ do
         it "gets axes permutations for valid equation" $
             axesPermutation' (Equation {
-                inp = [Single I, Single J]
-                , outp = [Single J, Single I]
+                inp = [Single B, Single H]
+                , outp = [Single H, Single B]
                 , axesLengths = []
                 })
             `shouldBe`
             rearrangeAxesPermutationPy (Equation {
-                inp = [Single I, Single J]
-                , outp = [Single J, Single I]
+                inp = [Single B, Single H]
+                , outp = [Single H, Single B]
                 , axesLengths = []
                 })
     hspec $ do
         it "returns error for duplicate dimension" $
             axesPermutation' (Equation {
-                inp = [Multiple [I,I]]
-                , outp = [Multiple [I,I]]
+                inp = [Multiple [B,B]]
+                , outp = [Multiple [B,B]]
                 , axesLengths = []
                 })
             `shouldBe`
             rearrangeAxesPermutationPy (Equation {
-                inp = [Multiple [I,I]]
-                , outp = [Multiple [I,I]]
+                inp = [Multiple [B,B]]
+                , outp = [Multiple [B,B]]
                 , axesLengths = []
                 })
-        -- -- this fails because I've taken the check out for now
+        -- -- this fails because B've taken the check out for now
         -- it "returns error for one side ident" $
         --     axesPermutation' (Equation {
-        --         inp = [Single I]
+        --         inp = [Single B]
         --         , outp = []
         --         , axesLengths = []
         --         })
         --     `shouldBe`
         --     rearrangeAxesPermutationPy (Equation {
-        --         inp = [Single I]
+        --         inp = [Single B]
         --         , outp = []
         --         , axesLengths = []
         --         })
@@ -692,65 +696,65 @@ main = do
     hspec $ do
         it "calculates elementary axes lengths" $
             elementaryAxesLengths' (Equation {
-                inp = [Single I, Single J]
-                , outp = [Single J, Single I]
-                , axesLengths = [(I,2)]
+                inp = [Single B, Single H]
+                , outp = [Single H, Single B]
+                , axesLengths = [(B,2)]
                 })
             `shouldBe`
             rearrangeElementaryAxesLengthsPy (Equation {
-                inp = [Single I, Single J]
-                , outp = [Single J, Single I]
-                , axesLengths = [(I,2)]
+                inp = [Single B, Single H]
+                , outp = [Single H, Single B]
+                , axesLengths = [(B,2)]
                 })
         it "calculates elementary axes lengths for multiples" $
             elementaryAxesLengths' (Equation {
-                inp = [Multiple [I0,I1], Single J]
-                , outp = [Single I0, Single I1, Single J]
-                , axesLengths = [(I1, 2)]
+                inp = [Multiple [W,C], Single H]
+                , outp = [Single W, Single C, Single H]
+                , axesLengths = [(C, 2)]
                 })
             `shouldBe`
             rearrangeElementaryAxesLengthsPy (Equation {
-                inp = [Multiple [I0,I1], Single J]
-                , outp = [Single I0, Single I1, Single J]
-                , axesLengths = [(I1, 2)]
+                inp = [Multiple [W,C], Single H]
+                , outp = [Single W, Single C, Single H]
+                , axesLengths = [(C, 2)]
                 })
 
     hspec $ do
         it "calculates input composite axes" $
             inputCompositeAxes' (Equation {
-                inp = [Multiple [I0,I1], Single J]
-                , outp = [Single I0, Single I1, Single J]
-                , axesLengths = [(I1, 2)]
+                inp = [Multiple [W,C], Single H]
+                , outp = [Single W, Single C, Single H]
+                , axesLengths = [(C, 2)]
                 })
             `shouldBe`
             rearrangeInputCompositeAxesPy (Equation {
-                inp = [Multiple [I0,I1], Single J]
-                , outp = [Single I0, Single I1, Single J]
-                , axesLengths = [(I1, 2)]
+                inp = [Multiple [W,C], Single H]
+                , outp = [Single W, Single C, Single H]
+                , axesLengths = [(C, 2)]
                 })
         it "calculates more composite axes" $
             inputCompositeAxes' (Equation {
-                inp = [Single J, Multiple [I0]]
-                , outp = [Single I0, Single J]
-                , axesLengths = [(I0, 2)]
+                inp = [Single H, Multiple [W]]
+                , outp = [Single W, Single H]
+                , axesLengths = [(W, 2)]
                 })
             `shouldBe`
             rearrangeInputCompositeAxesPy (Equation {
-                inp = [Single J, Multiple [I0]]
-                , outp = [Single I0, Single J]
-                , axesLengths = [(I0, 2)]
+                inp = [Single H, Multiple [W]]
+                , outp = [Single W, Single H]
+                , axesLengths = [(W, 2)]
                 })
     hspec $ do
         it "calculates reduced elementary axes" $
             reducedElementaryAxes' (Equation {
-                inp = [Single I, Single J]
-                , outp = [Single I]
+                inp = [Single B, Single H]
+                , outp = [Single B]
                 , axesLengths = []
                 })
             `shouldBe`
             reduceReducedElementaryAxesPy (Equation {
-                inp = [Single I, Single J]
-                , outp = [Single I]
+                inp = [Single B, Single H]
+                , outp = [Single B]
                 , axesLengths = []
                 })
 
@@ -771,8 +775,8 @@ main = do
 
 
     -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation Axis)
-    -- print $ ellipsisPositionInLhs [I, Ellipsis, J]
-    -- print $ ellipsisPositionInLhs [I, J]
-    -- print $ inputCompositeAxes S.empty $ fmap (fmap fromEnum) [Single I, Single J]
+    -- print $ ellipsisPositionInLhs [B, Ellipsis, H]
+    -- print $ ellipsisPositionInLhs [B, H]
+    -- print $ inputCompositeAxes S.empty $ fmap (fmap fromEnum) [Single B, Single H]
 
     pure ()
