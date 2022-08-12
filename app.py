@@ -25,7 +25,7 @@ def handle_exception(e: HTTPException) -> Response:
 def axes_permutation(action: str) -> Union[Response, str]:
     try:
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      action, ()).axes_permutation)
+                                                      'max' if action == 'reduce' else action, ()).axes_permutation)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
@@ -36,7 +36,7 @@ def axes_permutation(action: str) -> Union[Response, str]:
 def added_axes(action: str) -> Union[Response, str]:
     try:
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      action, ()).added_axes)
+                                                      'max' if action == 'reduce' else action, ()).added_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
@@ -47,7 +47,7 @@ def added_axes(action: str) -> Union[Response, str]:
 def output_composite_axes(action: str) -> Union[Response, str]:
     try:
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      action, ()).output_composite_axes)
+                                                      'max' if action == 'reduce' else action, ()).output_composite_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
@@ -59,7 +59,7 @@ def ellipsis_position_in_lhs(action: str) -> Union[Response, str]:
     try:
         res = _prepare_transformation_recipe(
             request.json['eqn'],
-            action, ()).ellipsis_position_in_lhs
+            'max' if action == 'reduce' else action, ()).ellipsis_position_in_lhs
         if res == 10000:
             res = None
         return jsonify(res)
@@ -97,7 +97,7 @@ def input_composite_axes(action: str) -> Union[Response, str]:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
         axes_lengths = tuple([tuple(x) for x in axes_lengths])
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      action, axes_lengths).input_composite_axes)
+                                                      'max' if action == 'reduce' else action, axes_lengths).input_composite_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
@@ -108,7 +108,7 @@ def input_composite_axes(action: str) -> Union[Response, str]:
 def reduced_elementary_axes(action: str) -> Union[Response, str]:
     try:
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
-                                                      action, ()).reduced_elementary_axes)
+                                                      'max' if action == 'reduce' else action, ()).reduced_elementary_axes)
     except Exception as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
