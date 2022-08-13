@@ -1,6 +1,6 @@
 from typing import Union, Tuple
 
-from einops.einops import _prepare_transformation_recipe, _reconstruct_from_shape
+from einops.einops import _prepare_transformation_recipe, _reconstruct_from_shape, EinopsError
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.sansio.response import Response
@@ -22,14 +22,15 @@ def handle_exception(e: HTTPException) -> Response:
     return response
 
 
+# generate python BEGIN
 @app.route('/<action>/added_axes', methods=['POST'])
 def added_axes(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
                                                       'max' if action == 'reduce' else action, axes_lengths).added_axes)
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -39,11 +40,11 @@ def added_axes(action: str) -> Union[Response, str]:
 def axes_permutation(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
                                                       'max' if action == 'reduce' else action,
                                                       axes_lengths).axes_permutation)
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -53,14 +54,14 @@ def axes_permutation(action: str) -> Union[Response, str]:
 def elementary_axes_lengths(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         res_tmp = _prepare_transformation_recipe(request.json['eqn'], 'max', axes_lengths)
         res = res_tmp.elementary_axes_lengths
         res_may = []
         for x in res:
             res_may += [None] if x == -999999 else [x]
         return jsonify(res_may)
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -70,11 +71,11 @@ def elementary_axes_lengths(action: str) -> Union[Response, str]:
 def ellipsis_position_in_lhs(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
                                                       'max' if action == 'reduce' else action,
                                                       axes_lengths).ellipsis_position_in_lhs)
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -84,11 +85,11 @@ def ellipsis_position_in_lhs(action: str) -> Union[Response, str]:
 def input_composite_axes(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
                                                       'max' if action == 'reduce' else action,
                                                       axes_lengths).input_composite_axes)
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -98,11 +99,11 @@ def input_composite_axes(action: str) -> Union[Response, str]:
 def output_composite_axes(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
                                                       'max' if action == 'reduce' else action,
                                                       axes_lengths).output_composite_axes)
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -112,14 +113,17 @@ def output_composite_axes(action: str) -> Union[Response, str]:
 def reduced_elementary_axes(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         return jsonify(_prepare_transformation_recipe(request.json['eqn'],
                                                       'max' if action == 'reduce' else action,
                                                       axes_lengths).reduced_elementary_axes)
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
+
+
+# generate python END
 
 
 reconstruct_fields = {
@@ -136,13 +140,13 @@ reconstruct_fields = {
 def init_shapes(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         recipe = _prepare_transformation_recipe(request.json['eqn'],
                                                 'max' if action == 'reduce' else action,
                                                 axes_lengths)
         return jsonify(_reconstruct_from_shape(recipe,
                                                ims.shape)[reconstruct_fields['init_shapes']])
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -152,13 +156,13 @@ def init_shapes(action: str) -> Union[Response, str]:
 def reduced_axes(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         recipe = _prepare_transformation_recipe(request.json['eqn'],
                                                 'max' if action == 'reduce' else action,
                                                 axes_lengths)
         return jsonify(_reconstruct_from_shape(recipe,
                                                ims.shape)[reconstruct_fields['reduced_axes']])
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -168,13 +172,13 @@ def reduced_axes(action: str) -> Union[Response, str]:
 def axes_reordering(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         recipe = _prepare_transformation_recipe(request.json['eqn'],
                                                 'max' if action == 'reduce' else action,
                                                 axes_lengths)
         return jsonify(_reconstruct_from_shape(recipe,
                                                ims.shape)[reconstruct_fields['axes_reordering']])
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -184,13 +188,13 @@ def axes_reordering(action: str) -> Union[Response, str]:
 def added_axes_reconstruct(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         recipe = _prepare_transformation_recipe(request.json['eqn'],
                                                 'max' if action == 'reduce' else action,
                                                 axes_lengths)
         return jsonify(_reconstruct_from_shape(recipe,
                                                ims.shape)[reconstruct_fields['added_axes_reconstruct']])
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
@@ -200,13 +204,13 @@ def added_axes_reconstruct(action: str) -> Union[Response, str]:
 def final_shapes(action: str) -> Union[Response, str]:
     try:
         axes_lengths: Tuple[tuple, ...] = request.json['axes_lengths']
-        axes_lengths = tuple([tuple(x) for x in axes_lengths])
+        axes_lengths = tuple(tuple(x) for x in axes_lengths)
         recipe = _prepare_transformation_recipe(request.json['eqn'],
                                                 'max' if action == 'reduce' else action,
                                                 axes_lengths)
         return jsonify(_reconstruct_from_shape(recipe,
                                                ims.shape)[reconstruct_fields['final_shapes']])
-    except Exception as err:
+    except EinopsError as err:
         print(f'unexpected {err}, {type(err)}')
         j = f'{err}'
     return j
