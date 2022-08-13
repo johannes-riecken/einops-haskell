@@ -44,9 +44,22 @@ import Servant.Client.Core.Request hiding (RequestBodyLBS, requestHeaders, reque
 import System.IO.Unsafe
 import Test.Hspec
 import Test.QuickCheck
+import Text.Printf
 import Witherable hiding (filter)
 
 sampleShape = [6,4,4,3]
+
+data TfCommand =
+    Reshape [Int]
+    | Reduce String [Int]
+    | Transpose [Int]
+    | ExpandDims Int deriving (Eq, Ord)
+
+instance Show TfCommand where
+    show (Reshape xs) = printf "x = tf.reshape(x, %s)" (show xs)
+    show (Reduce op xs) = printf "x = tf.reduce_%s(x, %s)" op (show xs)
+    show (Transpose xs) = printf "x = tf.transpose(x, %s)" (show xs)
+    show (ExpandDims x) = printf "x = tf.expand_dims(x, %d)" x
 
 data Axis = B
     | H
@@ -57,13 +70,6 @@ data Axis = B
     | Ellipsis
     -- | Anon Int -- TODO: Add to Arbitrary instance and deal with Bounded
     deriving (Eq, Ord, Bounded, Enum, Generic)
-
--- TODO: Figure out how to use this in Servant
-data Action =
-    Rearrange
-    | Reduce
-    | Repeat
-    deriving (Eq, Ord, Show)
 
 instance Show Axis where
     show B = "b"
@@ -775,9 +781,49 @@ addedAxesReconstruct :: Equation Axis -> AddedAxesReconstructRet
 addedAxesReconstruct _ = M.empty
 
 finalShapes :: Equation Axis -> FinalShapesRet
-finalShapes eqn = map (sampleShape !!) (axesPermutation eqn)
+finalShapes eqn = map (foldr ((*) . (sampleShape !!)) 1) (outputCompositeAxes eqn)
 
--- end of business logic
+-- end of reconstruct
+
+-- TODO: Generalize reduction type
+applyRecipe :: Equation Axis -> [TfCommand]
+applyRecipe eqn@Equation{..} = let
+    x = initShapes eqn
+    y = reducedAxes eqn
+    z = axesReordering eqn
+    w = addedAxesReconstruct eqn
+    v = finalShapes eqn
+    reshapeCmd = Reshape x
+    reduceCmds = getReduceCmds "max" y
+    transposeCmd = Transpose z
+    addAxisCmds = getAddAxisCmds (length z + length w) w
+    finalReshapeCmd = Reshape v
+    in
+    [reshapeCmd] ++ reduceCmds ++ [transposeCmd] ++ addAxisCmds ++ [finalReshapeCmd]
+
+-- TODO: Implement
+getAddAxisCmds :: Int -> Map Int Int -> [TfCommand]
+getAddAxisCmds _ _ = []
+
+-- TODO: Implement
+getReduceCmds :: String -> [Int] -> [TfCommand]
+getReduceCmds _ _ = []
+
+--     if len(added_axes) > 0:
+--         tensor = backend.add_axes(tensor, n_axes=len(axes_reordering) + len(added_axes), pos2len=added_axes)
+
+-- def _apply_recipe(recipe: TransformRecipe, tensor: Tensor, reduction_type: Reduction) -> Tensor:
+--     # this method works for all backends but not compilable with
+--     backend = get_backend(tensor)
+--     init_shapes, reduced_axes, axes_reordering, added_axes, final_shapes = \
+--         _reconstruct_from_shape(recipe, backend.shape(tensor))
+--     tensor = backend.reshape(tensor, init_shapes)
+--     tensor = _reduce_axes(tensor, reduction_type=reduction_type, reduced_axes=reduced_axes, backend=backend)
+--     tensor = backend.transpose(tensor, axes_reordering)
+--     if len(added_axes) > 0:
+--         tensor = backend.add_axes(tensor, n_axes=len(axes_reordering) + len(added_axes), pos2len=added_axes)
+--     return backend.reshape(tensor, final_shapes)
+
 
 newtype CC a = CC (Compose [] Composite a) deriving (Functor, Foldable, Traversable)
 
@@ -1082,7 +1128,32 @@ main = do
                 , outp = [Single H, Single B, Single W, Single C]
                 , axesLengths = []
                 })
-    -- TODO: Create endpoints for rearrange, reduce and repeat
+        it "calculates final shapes for composite axes" $
+            finalShapes' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Multiple [B, W], Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            rearrangeFinalShapesPy (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Multiple [B, W], Single C]
+                , axesLengths = []
+                })
+    hspec $ do
+        it "generates tf commands for rearrange" $
+            applyRecipe (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Multiple [B, W], Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            [
+            Reshape [6,4,4,3] -- TODO: remove redundant command
+            , Transpose [1,0,2,3]
+            , Reshape [4,24,3]
+            ]
+
     -- TODO: Support underscore axis
 
     -- PASS
