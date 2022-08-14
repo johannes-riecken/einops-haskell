@@ -2,11 +2,14 @@
 {-# LANGUAGE OverloadedStrings, DeriveGeneric, DataKinds, TypeOperators #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving #-}
+import Control.Applicative
+import Control.Applicative.Lift
 import Control.Arrow
 import Control.Monad
-import Control.Monad.Free
+import Control.Monad.Free hiding (Pure)
 import Control.Monad.Trans.State
 import Data.Aeson hiding ((.:))
 import qualified Data.ByteString.Char8 as BS (isInfixOf)
@@ -88,7 +91,25 @@ instance Arbitrary Axis where
 
 instance ToJSON Axis
 
+-- equals Sum Identity []
 data Composite a = Single a | Multiple [a] deriving (Functor, Foldable, Traversable, Show, Generic, Eq, Ord)
+
+instance Inject (Lift [] a) (Composite a) where
+    inj (Pure x) = Single x
+    inj (Other xs) = Multiple xs
+
+instance Project (Lift [] a) (Composite a) where
+    prj (Single x) = Pure x
+    prj (Multiple xs) = Other xs
+
+instance Isomorphic (Lift [] a) (Composite a)
+
+deriving via As1 (Lift []) Composite instance Applicative Composite
+
+instance (Monad m, Monad n, Traversable n) => Monad (Compose m n) where
+  ma >>= f = join_ (fmap f ma)
+    where join_ = Compose . fmap join . (sequence <=< (getCompose . fmap getCompose))
+
 
 instance Arbitrary a => Arbitrary (Composite a) where
     arbitrary = oneof [Single <$> arbitrary, Multiple <$> arbitrary]
@@ -701,7 +722,8 @@ repeatFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
 
 
 -- RECONSTRUCT AUTOGEN END
-
+intersectCompLists :: Ord a => [Composite a] -> [Composite a] -> [Composite a]
+intersectCompLists xs ys = uncc $ mapMaybe (\x -> if x `elem` cc ys then Just x else Nothing) (cc xs)
 
 axisNumsFromCompList :: Ord a => [Composite a] -> M.Map a Int
 axisNumsFromCompList = snd . foldl' (\(i,acc) x ->
@@ -712,7 +734,7 @@ axisNumsFromCompList = snd . foldl' (\(i,acc) x ->
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
 axesPermutation (Equation{..}) = let
-    axisNums = axisNumsFromCompList inp
+    axisNums = axisNumsFromCompList (intersectCompLists inp outp)
     in
     foldr ((:) . (axisNums M.!)) [] . cc $ outp
 
@@ -794,7 +816,7 @@ applyRecipe eqn@Equation{..} = let
     w = addedAxesReconstruct eqn
     v = finalShapes eqn
     reshapeCmd = Reshape x
-    reduceCmds = getReduceCmds "max" y
+    reduceCmds = if null y then [] else getReduceCmds "max" y
     transposeCmd = Transpose z
     addAxisCmds = getAddAxisCmds (length z + length w) w
     finalReshapeCmd = Reshape v
@@ -807,7 +829,7 @@ getAddAxisCmds _ _ = []
 
 -- TODO: Implement
 getReduceCmds :: String -> [Int] -> [TfCommand]
-getReduceCmds _ _ = []
+getReduceCmds op xs = [Reduce op xs]
 
 --     if len(added_axes) > 0:
 --         tensor = backend.add_axes(tensor, n_axes=len(axes_reordering) + len(added_axes), pos2len=added_axes)
@@ -825,7 +847,7 @@ getReduceCmds _ _ = []
 --     return backend.reshape(tensor, final_shapes)
 
 
-newtype CC a = CC (Compose [] Composite a) deriving (Functor, Foldable, Traversable)
+newtype CC a = CC (Compose [] Composite a) deriving (Functor, Foldable, Traversable, Applicative, Alternative)
 
 -- smart constructor
 cc :: [Composite a] -> CC a
@@ -982,6 +1004,18 @@ main = do
                 , outp = [Multiple [B,B]]
                 , axesLengths = []
                 })
+        it "calculates axes permutation for reduction" $
+            axesPermutation' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single B, Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            reduceAxesPermutationPy (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single B, Single C]
+                , axesLengths = []
+                })
         -- -- this fails because I've taken the check out for now
         -- it "returns error for one side ident" $
         --     axesPermutation' (Equation {
@@ -1101,6 +1135,19 @@ main = do
                 , outp = [Single H, Single B, Single W, Single C]
                 , axesLengths = []
                 })
+        it "calculates axes reordering for reduction" $
+            axesReordering' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single B, Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            reduceAxesReorderingPy (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single B, Single C]
+                , axesLengths = []
+                })
+
 
     hspec $ do
         it "calculates added axes for reconstruct" $
@@ -1153,6 +1200,20 @@ main = do
             , Transpose [1,0,2,3]
             , Reshape [4,24,3]
             ]
+        it "generates tf commands for reduce" $
+            applyRecipe (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single B, Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            [
+            Reshape [6, 4, 4, 3]
+            , Reduce "max" [1, 2]
+            , Transpose [0, 1]
+            , Reshape [6, 3]
+            ]
+
 
     -- TODO: Support underscore axis
 
