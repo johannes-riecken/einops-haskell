@@ -8,6 +8,7 @@
 import Control.Applicative
 import Control.Applicative.Lift
 import Control.Arrow
+import Control.Lens (imap)
 import Control.Monad
 import Control.Monad.Free hiding (Pure)
 import Control.Monad.Trans.State
@@ -802,9 +803,25 @@ axesReordering = axesPermutation
 addedAxesReconstruct :: Equation Axis -> AddedAxesReconstructRet
 addedAxesReconstruct _ = M.empty
 
+-- TODO: allow deeper nesting
+-- TODO: Fuse
 finalShapes :: Equation Axis -> FinalShapesRet
-finalShapes eqn = map (foldr ((*) . (sampleShape !!)) 1) (outputCompositeAxes eqn)
-
+-- finalShapes eqn@Equation{..} = map (foldr ((*) . (sampleShape !!)) 1) (outputCompositeAxes eqn)
+finalShapes eqn@Equation{..} = map (foldr ((*) . (sizes M.!)) 1) outp
+    where
+        sizes = M.fromList . snd $ foldr (\x' (i,acc) -> case x' of
+            Single x -> (i-1,(x, sampleShape !! i):acc)
+            Multiple xs -> (i-1,handleMultiple i xs ++ acc)
+            ) (length inp - 1,[]) inp
+        handleMultiple :: Int -> [Axis] -> [(Axis,Int)]
+        handleMultiple i xs = map (\x -> if x `M.member` axesLengthsMap then
+            (x,axesLengthsMap M.! x) :: (Axis,Int)
+            else
+            (x,sampleShape !! i `div` prod xs) :: (Axis,Int)
+            ) xs
+            where
+                prod = product . map (axesLengthsMap M.!) . filter (`M.member` axesLengthsMap)
+        axesLengthsMap = M.fromList axesLengths
 -- end of reconstruct
 
 -- TODO: Generalize reduction type
@@ -978,6 +995,11 @@ errAxis = [Multiple [H, Ellipsis], Single H]
 
 main :: IO ()
 main = do
+    print $ finalShapes' (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Single H, Multiple [B, W], Single C]
+                , axesLengths = []
+                })
     hspec $ do
         it "gets axes permutations for valid equation" $
             axesPermutation' (Equation {
@@ -1182,10 +1204,18 @@ main = do
                 , axesLengths = []
                 })
             `shouldBe`
+            Right [4,24,3]
+        it "calculates final shapes for split initial axis" $
+            finalShapes' (Equation {
+                inp = [Single B, Single H, Multiple [I, W], Single C]
+                , outp = [Single I, Single B, Single H, Single W, Single C]
+                , axesLengths = [(I,2)]
+                })
+            `shouldBe`
             rearrangeFinalShapesPy (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Multiple [B, W], Single C]
-                , axesLengths = []
+                inp = [Single B, Single H, Multiple [I, W], Single C]
+                , outp = [Single I, Single B, Single H, Single W, Single C]
+                , axesLengths = [(I,2)]
                 })
     hspec $ do
         it "generates tf commands for rearrange" $
@@ -1213,6 +1243,31 @@ main = do
             , Transpose [0, 1]
             , Reshape [6, 3]
             ]
+        it "generates tf commands for full reduce" $
+            applyRecipe (Equation {
+                inp = [Single B, Single H, Single W, Single C]
+                , outp = [Multiple [B, H, W, C]]
+                , axesLengths = []
+                })
+            `shouldBe`
+            [
+            Reshape [6, 4, 4, 3]
+            , Transpose [0, 1, 2, 3]
+            , Reshape [288]
+            ]
+        -- it "generates tf commands for split initial axis" $
+        --     applyRecipe (Equation {
+        --         inp = [Single B, Single H, Multiple [I, W], Single C]
+        --         , outp = [Single I, Single B, Single H, Single W, Single C]
+        --         , axesLengths = [(I,2)]
+        --         })
+        --     `shouldBe`
+        --     [
+        --     Reshape [6, 4, 2, 2, 3]
+        --     , Transpose [2, 0, 1, 3, 4]
+        --     , Reshape [2, 6, 4, 2, 3]
+        --     ]
+
 
 
     -- TODO: Support underscore axis
