@@ -787,9 +787,28 @@ inputCompositeAxes eqn@Equation{..} =
             foldr (select (`S.member` known) . (axisNums M.!)) ([],[])
             ) inp
 
--- TODO: Implement
+-- TODO: fuse
+-- TODO: allow deeper nesting of Composite
+initMap :: Equation Axis -> Map Axis Int
+initMap eqn@Equation{..} =
+    let
+    sizes = M.fromList . snd $ foldr (\x' (i,acc) -> case x' of
+            Single x -> (i-1,(x, sampleShape !! i):acc)
+            Multiple xs -> (i-1,handleMultiple i xs ++ acc)
+            ) (length inp - 1,[]) inp
+    handleMultiple :: Int -> [Axis] -> [(Axis,Int)]
+    handleMultiple i xs = map (\x -> if x `M.member` axesLengthsMap then
+        (x,axesLengthsMap M.! x) :: (Axis,Int)
+        else
+        (x,sampleShape !! i `div` prod xs) :: (Axis,Int)
+        ) xs
+        where
+            prod = product . map (axesLengthsMap M.!) . filter (`M.member` axesLengthsMap)
+    axesLengthsMap = M.fromList axesLengths
+    in sizes
+
 initShapes :: Equation Axis -> InitShapesRet
-initShapes _ = [6,4,4,3]
+initShapes eqn@Equation{..} = map (initMap eqn M.!) (flatten inp)
 
 -- TODO: remove
 reducedAxes :: Equation Axis -> ReducedAxesRet
@@ -807,21 +826,7 @@ addedAxesReconstruct _ = M.empty
 -- TODO: Fuse
 finalShapes :: Equation Axis -> FinalShapesRet
 -- finalShapes eqn@Equation{..} = map (foldr ((*) . (sampleShape !!)) 1) (outputCompositeAxes eqn)
-finalShapes eqn@Equation{..} = map (foldr ((*) . (sizes M.!)) 1) outp
-    where
-        sizes = M.fromList . snd $ foldr (\x' (i,acc) -> case x' of
-            Single x -> (i-1,(x, sampleShape !! i):acc)
-            Multiple xs -> (i-1,handleMultiple i xs ++ acc)
-            ) (length inp - 1,[]) inp
-        handleMultiple :: Int -> [Axis] -> [(Axis,Int)]
-        handleMultiple i xs = map (\x -> if x `M.member` axesLengthsMap then
-            (x,axesLengthsMap M.! x) :: (Axis,Int)
-            else
-            (x,sampleShape !! i `div` prod xs) :: (Axis,Int)
-            ) xs
-            where
-                prod = product . map (axesLengthsMap M.!) . filter (`M.member` axesLengthsMap)
-        axesLengthsMap = M.fromList axesLengths
+finalShapes eqn@Equation{..} = map (foldr ((*) . (initMap eqn M.!)) 1) outp
 -- end of reconstruct
 
 -- TODO: Generalize reduction type
@@ -1255,18 +1260,18 @@ main = do
             , Transpose [0, 1, 2, 3]
             , Reshape [288]
             ]
-        -- it "generates tf commands for split initial axis" $
-        --     applyRecipe (Equation {
-        --         inp = [Single B, Single H, Multiple [I, W], Single C]
-        --         , outp = [Single I, Single B, Single H, Single W, Single C]
-        --         , axesLengths = [(I,2)]
-        --         })
-        --     `shouldBe`
-        --     [
-        --     Reshape [6, 4, 2, 2, 3]
-        --     , Transpose [2, 0, 1, 3, 4]
-        --     , Reshape [2, 6, 4, 2, 3]
-        --     ]
+        it "generates tf commands for split initial axis" $
+            applyRecipe (Equation {
+                inp = [Single B, Single H, Multiple [I, W], Single C]
+                , outp = [Single I, Single B, Single H, Single W, Single C]
+                , axesLengths = [(I,2)]
+                })
+            `shouldBe`
+            [
+            Reshape [6, 4, 2, 2, 3]
+            , Transpose [2, 0, 1, 3, 4]
+            , Reshape [2, 6, 4, 2, 3]
+            ]
 
 
 
