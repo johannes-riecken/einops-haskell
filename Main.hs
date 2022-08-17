@@ -1,10 +1,15 @@
-{-# LANGUAGE RecordWildCards, DeriveTraversable, LambdaCase #-}
-{-# LANGUAGE OverloadedStrings, DeriveGeneric, DataKinds, TypeOperators #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeOperators #-}
+
 import Control.Applicative
 import Control.Applicative.Lift
 import Control.Arrow
@@ -71,7 +76,6 @@ data Axis = B
     | C
     | I
     | T
-    | Ellipsis
     -- | Anon Int -- TODO: Add to Arbitrary instance and deal with Bounded
     deriving (Eq, Ord, Bounded, Enum, Generic)
 
@@ -82,12 +86,10 @@ instance Show Axis where
     show C = "c"
     show I = "i"
     show T = "t"
-    -- show Ellipsis = "…"
-    show Ellipsis = "..."
     -- show (Anon x) = show x
 
 instance Arbitrary Axis where
-    arbitrary = elements [B, H, Ellipsis]
+    arbitrary = elements [B, H, W]
     shrink = genericShrink
 
 instance ToJSON Axis
@@ -164,7 +166,6 @@ flatten = (=<<) F.toList
 
 type AxesPermutationRet = [Int]
 type AddedAxesRet = [Int]
-type EllipsisPositionInLhsRet = Maybe Int
 type OutputCompositeAxesRet = [[Int]]
 type ElementaryAxesLengthsRet = [Maybe Int]
 type InputCompositeAxesRet = [([Int], [Int])]
@@ -178,7 +179,7 @@ type FinalShapesRet = [Int]
 
 -- AUTOGEN BEGIN
 addedAxes' :: Equation Axis -> Either BS.ByteString AddedAxesRet
-addedAxes' = fmap addedAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+addedAxes' = fmap addedAxes . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeAddedAxesAPI = "/rearrange/added_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesRet
 
@@ -223,7 +224,7 @@ repeatAddedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 axesPermutation' :: Equation Axis -> Either BS.ByteString AxesPermutationRet
-axesPermutation' = fmap axesPermutation . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+axesPermutation' = fmap axesPermutation . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeAxesPermutationAPI = "/rearrange/axes_permutation" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesPermutationRet
 
@@ -268,7 +269,7 @@ repeatAxesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 elementaryAxesLengths' :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
-elementaryAxesLengths' = fmap elementaryAxesLengths . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+elementaryAxesLengths' = fmap elementaryAxesLengths . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeElementaryAxesLengthsAPI = "/rearrange/elementary_axes_lengths" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ElementaryAxesLengthsRet
 
@@ -312,53 +313,8 @@ repeatElementaryAxesLengthsPy xs = either (Left . findError) Right . unsafePerfo
     runClientM (repeatElementaryAxesLengthsRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-ellipsisPositionInLhs' :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
-ellipsisPositionInLhs' = fmap ellipsisPositionInLhs . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
-
-type RearrangeEllipsisPositionInLhsAPI = "/rearrange/ellipsis_position_in_lhs" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] EllipsisPositionInLhsRet
-
-rearrangeEllipsisPositionInLhsAPI :: Proxy RearrangeEllipsisPositionInLhsAPI
-rearrangeEllipsisPositionInLhsAPI = Proxy
-
-rearrangeEllipsisPositionInLhsRequest :: EquationStr Axis -> ClientM EllipsisPositionInLhsRet
-rearrangeEllipsisPositionInLhsRequest = client rearrangeEllipsisPositionInLhsAPI
-
-rearrangeEllipsisPositionInLhsPy :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
-rearrangeEllipsisPositionInLhsPy xs = either (Left . findError) Right . unsafePerformIO $ do
-    mngr <- newManager defaultManagerSettings
-    runClientM (rearrangeEllipsisPositionInLhsRequest . eqnToEqnStr $ xs) (
-        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
-
-type ReduceEllipsisPositionInLhsAPI = "/reduce/ellipsis_position_in_lhs" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] EllipsisPositionInLhsRet
-
-reduceEllipsisPositionInLhsAPI :: Proxy ReduceEllipsisPositionInLhsAPI
-reduceEllipsisPositionInLhsAPI = Proxy
-
-reduceEllipsisPositionInLhsRequest :: EquationStr Axis -> ClientM EllipsisPositionInLhsRet
-reduceEllipsisPositionInLhsRequest = client reduceEllipsisPositionInLhsAPI
-
-reduceEllipsisPositionInLhsPy :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
-reduceEllipsisPositionInLhsPy xs = either (Left . findError) Right . unsafePerformIO $ do
-    mngr <- newManager defaultManagerSettings
-    runClientM (reduceEllipsisPositionInLhsRequest . eqnToEqnStr $ xs) (
-        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
-
-type RepeatEllipsisPositionInLhsAPI = "/repeat/ellipsis_position_in_lhs" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] EllipsisPositionInLhsRet
-
-repeatEllipsisPositionInLhsAPI :: Proxy RepeatEllipsisPositionInLhsAPI
-repeatEllipsisPositionInLhsAPI = Proxy
-
-repeatEllipsisPositionInLhsRequest :: EquationStr Axis -> ClientM EllipsisPositionInLhsRet
-repeatEllipsisPositionInLhsRequest = client repeatEllipsisPositionInLhsAPI
-
-repeatEllipsisPositionInLhsPy :: Equation Axis -> Either BS.ByteString EllipsisPositionInLhsRet
-repeatEllipsisPositionInLhsPy xs = either (Left . findError) Right . unsafePerformIO $ do
-    mngr <- newManager defaultManagerSettings
-    runClientM (repeatEllipsisPositionInLhsRequest . eqnToEqnStr $ xs) (
-        mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
-
 inputCompositeAxes' :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
-inputCompositeAxes' = fmap inputCompositeAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+inputCompositeAxes' = fmap inputCompositeAxes . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeInputCompositeAxesAPI = "/rearrange/input_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InputCompositeAxesRet
 
@@ -403,7 +359,7 @@ repeatInputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformI
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 outputCompositeAxes' :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
-outputCompositeAxes' = fmap outputCompositeAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+outputCompositeAxes' = fmap outputCompositeAxes . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeOutputCompositeAxesAPI = "/rearrange/output_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] OutputCompositeAxesRet
 
@@ -448,7 +404,7 @@ repeatOutputCompositeAxesPy xs = either (Left . findError) Right . unsafePerform
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 reducedElementaryAxes' :: Equation Axis -> Either BS.ByteString ReducedElementaryAxesRet
-reducedElementaryAxes' = fmap reducedElementaryAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+reducedElementaryAxes' = fmap reducedElementaryAxes . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeReducedElementaryAxesAPI = "/rearrange/reduced_elementary_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedElementaryAxesRet
 
@@ -496,7 +452,7 @@ repeatReducedElementaryAxesPy xs = either (Left . findError) Right . unsafePerfo
 
 -- RECONSTRUCT AUTOGEN BEGIN
 initShapes' :: Equation Axis -> Either BS.ByteString InitShapesRet
-initShapes' = fmap initShapes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+initShapes' = fmap initShapes . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeInitShapesAPI = "/rearrange/init_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InitShapesRet
 
@@ -541,7 +497,7 @@ repeatInitShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 reducedAxes' :: Equation Axis -> Either BS.ByteString ReducedAxesRet
-reducedAxes' = fmap reducedAxes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+reducedAxes' = fmap reducedAxes . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeReducedAxesAPI = "/rearrange/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
 
@@ -586,7 +542,7 @@ repeatReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 axesReordering' :: Equation Axis -> Either BS.ByteString AxesReorderingRet
-axesReordering' = fmap axesReordering . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+axesReordering' = fmap axesReordering . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeAxesReorderingAPI = "/rearrange/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
 
@@ -631,7 +587,7 @@ repeatAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ 
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 addedAxesReconstruct' :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
-addedAxesReconstruct' = fmap addedAxesReconstruct . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+addedAxesReconstruct' = fmap addedAxesReconstruct . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeAddedAxesReconstructAPI = "/rearrange/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
 
@@ -676,7 +632,7 @@ repeatAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerfor
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 finalShapes' :: Equation Axis -> Either BS.ByteString FinalShapesRet
-finalShapes' = fmap finalShapes . (checkDuplDim <=< checkLeftEllipsis <=< checkEllipsisIsParen <=< checkRightDuplDim <=< checkDuplicateEllipsis)
+finalShapes' = fmap finalShapes . (checkDuplDim <=< checkRightDuplDim)
 
 type RearrangeFinalShapesAPI = "/rearrange/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
 
@@ -761,15 +717,6 @@ outputCompositeAxes eqn@(Equation{..}) = let
 elementaryAxesLengths :: Equation Axis -> ElementaryAxesLengthsRet
 elementaryAxesLengths eqn@Equation{..} = let m = M.fromList axesLengths in
     foldr ((:) . (`M.lookup` m)) [] . cc $ inp
-
--- ellipsisPositionInLhs (for now) gives the ellipsis position in the flattened
--- input axes
--- TODO: Error handling for two ellipses or ellipsis within composite axis
-ellipsisPositionInLhs :: Equation Axis -> Maybe Int
-ellipsisPositionInLhs xs = let inp' = inp xs in
-    fmap fst . listToMaybe . snd .
-    foldr (\x (i,acc) -> if x == Single Ellipsis then (i+1,(i,x):acc) else (i+1,acc))
-        (length inp' - 1, []) $ inp'
 
 -- unexported helper from Data.List
 select :: (a -> Bool) -> a -> ([a], [a]) -> ([a], [a])
@@ -901,8 +848,8 @@ instance Witherable CC
 
 fixup :: Equation Axis -> Equation Axis
 fixup eqn@Equation{..} = let
-    inp' = uncc . remDupl . cc . remEllFromMult $ inp
-    outp' = uncc . remDupl . cc . remEllFromMult $ outp
+    inp' = uncc . remDupl . cc $ inp
+    outp' = uncc . remDupl . cc $ outp
     in eqn{inp = inp', outp = outp'}
 
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
@@ -910,13 +857,6 @@ remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S
 
 remDupl' :: [Composite Axis] -> [Composite Axis]
 remDupl' = uncc . remDupl . cc
-
--- remEllFromMult removes ellipses from Multiples
-remEllFromMult :: [Composite Axis] -> [Composite Axis]
-remEllFromMult = map (\case
-    Single x -> Single x
-    Multiple xs -> Multiple $ filter (/= Ellipsis) xs
-    )
 
 -- TODO: check this if operation is rearrange
 -- checkOneSideIdent :: (Show (f a),Eq (f a),Foldable f) => Equation (f a) -> Either String (Equation (f a))
@@ -951,23 +891,6 @@ checkRightDuplDim eqn@(Equation{..}) = if flatten outp == flatten (remDupl' outp
         ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) :: Axis
         dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
 
-checkLeftEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkLeftEllipsis eqn@(Equation{..}) | Ellipsis `elem` flatten inp && Ellipsis `notElem` flatten outp = Left $ "Ellipsis found in left side, but not right side of a pattern " <> BS.pack (eqnToStr eqn)
-checkLeftEllipsis eqn = Right eqn
-
-checkRightEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
--- TODO: Check if latest einops still has this bug
-checkRightEllipsis eqn@(Equation{..}) | Ellipsis `elem` flatten outp && Ellipsis `notElem` flatten inp = Left $ "Ellipsis found in left side, but not right side of a pattern " <> BS.pack (eqnToStr eqn)
-checkRightEllipsis eqn = Right eqn
-
-checkEllipsisIsParen :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkEllipsisIsParen eqn@(Equation{..}) | Ellipsis `elem` flatten (filter (\case (Multiple _) -> True; _ -> False) inp) = Left $ "Ellipsis is parenthesis in the left side is not allowed:  " <> BS.pack (eqnToStr eqn)
-checkEllipsisIsParen eqn = Right eqn
-
-checkDuplicateEllipsis :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkDuplicateEllipsis eqn@(Equation{..}) | length (filter (==Ellipsis) (flatten inp)) > 1 = Left "Expression may contain dots only inside ellipsis (...); only one ellipsis for tensor "
-checkDuplicateEllipsis eqn = Right eqn
-
 checkLeftAxisUnused :: Equation Axis -> Either BS.ByteString (Equation Axis)
 checkLeftAxisUnused eqn@(Equation{..}) =
     case find (`notElem` flatten inp) (map fst axesLengths) of
@@ -980,29 +903,9 @@ checkRightAxisUnused eqn@(Equation{..}) =
         Just x -> Left $ "Axis " <> BS.pack (show x) <> " is not used in transform"
         Nothing -> Right eqn
 
-checkAxisInvalidName :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkAxisInvalidName eqn@(Equation{..}) | Ellipsis `elem` map fst axesLengths = Left "('Invalid name for an axis', '...')"
-checkAxisInvalidName eqn = Right eqn
-
-findError :: ClientError -> BS.ByteString -- TODO: Make Unicode ellipsis (U+2026 display correctly
+findError :: ClientError -> BS.ByteString
 findError (UnsupportedContentType req resp@Response{..}) = responseBody
 findError x = error (show x)
-
--- Observed order:
--- OneSideIdent < LeftEllipsis in EllipsisPositionInLhs
--- RightEllipsis < OneSideIdent in EllipsisPositionInLhs
--- DuplDim (on right side) < OneSideIdent in EllipsisPositionInLhs
--- LeftEllipsis < OneSideIdent in OutputCompositeAxes
-
-emptyAxis :: [Composite Axis]
-emptyAxis = []
-
-iAxis :: [Composite Axis]
-iAxis = [Single B]
-
-ijeAxis = [Multiple [B,H], Single Ellipsis]
-
-errAxis = [Multiple [H, Ellipsis], Single H]
 
 main :: IO ()
 main = do
