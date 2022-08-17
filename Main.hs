@@ -789,18 +789,18 @@ inputCompositeAxes eqn@Equation{..} =
 
 -- TODO: fuse
 -- TODO: allow deeper nesting of Composite
-initMap :: Equation Axis -> Map Axis Int
-initMap eqn@Equation{..} =
+initMap :: Equation Axis -> [Int] -> Map Axis Int
+initMap eqn@Equation{..} shape =
     let
     sizes = M.fromList . snd $ foldr (\x' (i,acc) -> case x' of
-            Single x -> (i-1,(x, sampleShape !! i):acc)
+            Single x -> (i-1,(x, shape !! i):acc)
             Multiple xs -> (i-1,handleMultiple i xs ++ acc)
             ) (length inp - 1,[]) inp
     handleMultiple :: Int -> [Axis] -> [(Axis,Int)]
     handleMultiple i xs = map (\x -> if x `M.member` axesLengthsMap then
         (x,axesLengthsMap M.! x) :: (Axis,Int)
         else
-        (x,sampleShape !! i `div` prod xs) :: (Axis,Int)
+        (x,shape !! i `div` prod xs) :: (Axis,Int)
         ) xs
         where
             prod = product . map (axesLengthsMap M.!) . filter (`M.member` axesLengthsMap)
@@ -808,7 +808,11 @@ initMap eqn@Equation{..} =
     in sizes
 
 initShapes :: Equation Axis -> InitShapesRet
-initShapes eqn@Equation{..} = map (initMap eqn M.!) (flatten inp)
+initShapes = initShapesWithShape sampleShape
+
+-- TODO: fuse
+initShapesWithShape :: [Int] -> Equation Axis -> InitShapesRet
+initShapesWithShape shape eqn@Equation{..} = map (initMap eqn shape M.!) (flatten inp)
 
 -- TODO: remove
 reducedAxes :: Equation Axis -> ReducedAxesRet
@@ -822,21 +826,23 @@ axesReordering = axesPermutation
 addedAxesReconstruct :: Equation Axis -> AddedAxesReconstructRet
 addedAxesReconstruct _ = M.empty
 
--- TODO: allow deeper nesting
--- TODO: Fuse
 finalShapes :: Equation Axis -> FinalShapesRet
--- finalShapes eqn@Equation{..} = map (foldr ((*) . (sampleShape !!)) 1) (outputCompositeAxes eqn)
-finalShapes eqn@Equation{..} = map (foldr ((*) . (initMap eqn M.!)) 1) outp
+finalShapes = finalShapesWithShape sampleShape
+
+-- TODO: allow deeper nesting
+-- TODO: fuse
+finalShapesWithShape :: [Int] -> Equation Axis -> FinalShapesRet
+finalShapesWithShape shape eqn@Equation{..} = map (foldr ((*) . (initMap eqn shape M.!)) 1) outp
 -- end of reconstruct
 
 -- TODO: Generalize reduction type
-applyRecipe :: Equation Axis -> [TfCommand]
-applyRecipe eqn@Equation{..} = let
-    x = initShapes eqn
+applyRecipe :: [Int] -> Equation Axis -> [TfCommand]
+applyRecipe shape eqn@Equation{..} = let
+    x = initShapesWithShape shape eqn
     y = reducedAxes eqn
     z = axesReordering eqn
     w = addedAxesReconstruct eqn
-    v = finalShapes eqn
+    v = finalShapesWithShape shape eqn
     reshapeCmd = Reshape x
     reduceCmds = if null y then [] else getReduceCmds "max" y
     transposeCmd = Transpose z
@@ -1224,7 +1230,7 @@ main = do
                 })
     hspec $ do
         it "generates tf commands for rearrange" $
-            applyRecipe (Equation {
+            applyRecipe sampleShape (Equation {
                 inp = [Single B, Single H, Single W, Single C]
                 , outp = [Single H, Multiple [B, W], Single C]
                 , axesLengths = []
@@ -1236,7 +1242,7 @@ main = do
             , Reshape [4,24,3]
             ]
         it "generates tf commands for reduce" $
-            applyRecipe (Equation {
+            applyRecipe sampleShape (Equation {
                 inp = [Single B, Single H, Single W, Single C]
                 , outp = [Single B, Single C]
                 , axesLengths = []
@@ -1249,7 +1255,7 @@ main = do
             , Reshape [6, 3]
             ]
         it "generates tf commands for full reduce" $
-            applyRecipe (Equation {
+            applyRecipe sampleShape (Equation {
                 inp = [Single B, Single H, Single W, Single C]
                 , outp = [Multiple [B, H, W, C]]
                 , axesLengths = []
@@ -1261,7 +1267,7 @@ main = do
             , Reshape [288]
             ]
         it "generates tf commands for split initial axis" $
-            applyRecipe (Equation {
+            applyRecipe sampleShape (Equation {
                 inp = [Single B, Single H, Multiple [I, W], Single C]
                 , outp = [Single I, Single B, Single H, Single W, Single C]
                 , axesLengths = [(I,2)]
@@ -1272,6 +1278,19 @@ main = do
             , Transpose [2, 0, 1, 3, 4]
             , Reshape [2, 6, 4, 2, 3]
             ]
+        it "generates tf commands for different shape" $
+            applyRecipe (tail sampleShape) (Equation {
+                inp = [Single H, Single W, Single C]
+                , outp = [Multiple [H, W], Single C]
+                , axesLengths = []
+                })
+            `shouldBe`
+            [
+            Reshape [4, 4, 3]
+            , Transpose [0, 1, 2]
+            , Reshape [16, 3]
+            ]
+
 
 
 
