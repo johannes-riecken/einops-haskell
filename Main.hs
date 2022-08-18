@@ -71,7 +71,7 @@ instance Show TfCommand where
     show (Transpose xs) = printf "x = tf.transpose(x, %s)" (show xs)
     show (ExpandDims x) = printf "x = tf.expand_dims(x, %d)" x
 
-newtype Axis a = Axis { getAxis :: Maybe a } deriving (Arbitrary)
+newtype Axis a = Axis { getAxis :: Maybe a } deriving (Arbitrary,Functor,Applicative,Monad,Foldable,Traversable)
 
 axis :: String -> Axis String
 axis x = Axis (Just x)
@@ -825,12 +825,13 @@ newtype CC a = CC (Compose [] Composite a) deriving (Functor, Foldable, Traversa
 cc :: [Composite a] -> CC a
 cc = CC . Compose
 
--- newtype CCC m a = CCC (Compose [] (Compose [] (Axis a)
-
--- cc :: [Composite Axis] -> CCC a deriving (Functor, Foldable, Traversable, Applicative, Alternative)
-
 uncc :: CC a -> [Composite a]
 uncc (CC (Compose x)) = x
+
+newtype CCC a = CCC (Compose (Compose [] Composite) Axis a) deriving (Functor, Foldable, Traversable, Applicative, Alternative)
+
+ccc :: [Composite (Axis a)] -> CCC a
+ccc = CCC . Compose . Compose
 
 instance Filterable CC where
    mapMaybe _ (CC (Compose []))     = CC (Compose [])
