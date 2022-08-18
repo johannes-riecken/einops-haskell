@@ -70,29 +70,21 @@ instance Show TfCommand where
     show (Transpose xs) = printf "x = tf.transpose(x, %s)" (show xs)
     show (ExpandDims x) = printf "x = tf.expand_dims(x, %d)" x
 
-data Axis = B
-    | H
-    | W
-    | C
-    | I
-    | T
-    -- | Anon Int -- TODO: Add to Arbitrary instance and deal with Bounded
-    deriving (Eq, Ord, Bounded, Enum, Generic)
+newtype Axis = Axis { getAxis :: Maybe String } deriving (Eq, Ord, Arbitrary)
+
+axis :: String -> Axis
+axis x = Axis (Just x)
+
+anon :: Axis
+anon = Axis Nothing
 
 instance Show Axis where
-    show B = "b"
-    show H = "h"
-    show W = "w"
-    show C = "c"
-    show I = "i"
-    show T = "t"
-    -- show (Anon x) = show x
+    show (Axis (Just x)) = x
+    show (Axis Nothing) = "()"
 
-instance Arbitrary Axis where
-    arbitrary = elements [B, H, W]
-    shrink = genericShrink
-
-instance ToJSON Axis
+instance ToJSON Axis where
+    toJSON (Axis (Just x)) = toJSON x
+    toJSON (Axis Nothing) = toJSON ("()" :: String)
 
 -- equals Sum Identity []
 data Composite a = Single a | Multiple [a] deriving (Functor, Foldable, Traversable, Show, Generic, Eq, Ord)
@@ -910,58 +902,58 @@ findError x = error (show x)
 main :: IO ()
 main = do
     print $ finalShapes' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Multiple [B, W], Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Multiple [axis "B", axis "W"], Single (axis "C")]
                 , axesLengths = []
                 })
     hspec $ do
         it "gets axes permutations for valid equation" $
             axesPermutation' (Equation {
-                inp = [Single B, Single H]
-                , outp = [Single H, Single B]
+                inp = [Single (axis "B"), Single (axis "H")]
+                , outp = [Single (axis "H"), Single (axis "B")]
                 , axesLengths = []
                 })
             `shouldBe`
             rearrangeAxesPermutationPy (Equation {
-                inp = [Single B, Single H]
-                , outp = [Single H, Single B]
+                inp = [Single (axis "B"), Single (axis "H")]
+                , outp = [Single (axis "H"), Single (axis "B")]
                 , axesLengths = []
                 })
     hspec $ do
         it "returns error for duplicate dimension" $
             axesPermutation' (Equation {
-                inp = [Multiple [B,B]]
-                , outp = [Multiple [B,B]]
+                inp = [Multiple [axis "B", axis "B"]]
+                , outp = [Multiple [axis "B", axis "B"]]
                 , axesLengths = []
                 })
             `shouldBe`
             rearrangeAxesPermutationPy (Equation {
-                inp = [Multiple [B,B]]
-                , outp = [Multiple [B,B]]
+                inp = [Multiple [axis "B", axis "B"]]
+                , outp = [Multiple [axis "B", axis "B"]]
                 , axesLengths = []
                 })
         it "calculates axes permutation for reduction" $
             axesPermutation' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single B, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "B"), Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
             reduceAxesPermutationPy (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single B, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "B"), Single (axis "C")]
                 , axesLengths = []
                 })
         -- -- this fails because I've taken the check out for now
         -- it "returns error for one side ident" $
         --     axesPermutation' (Equation {
-        --         inp = [Single B]
+        --         inp = [Single (axis "B")]
         --         , outp = []
         --         , axesLengths = []
         --         })
         --     `shouldBe`
         --     rearrangeAxesPermutationPy (Equation {
-        --         inp = [Single B]
+        --         inp = [Single (axis "B")]
         --         , outp = []
         --         , axesLengths = []
         --         })
@@ -969,118 +961,118 @@ main = do
     hspec $ do
         it "calculates elementary axes lengths" $
             elementaryAxesLengths' (Equation {
-                inp = [Single B, Single H]
-                , outp = [Single H, Single B]
-                , axesLengths = [(B,2)]
+                inp = [Single (axis "B"), Single (axis "H")]
+                , outp = [Single (axis "H"), Single (axis "B")]
+                , axesLengths = [(axis "B",2)]
                 })
             `shouldBe`
             rearrangeElementaryAxesLengthsPy (Equation {
-                inp = [Single B, Single H]
-                , outp = [Single H, Single B]
-                , axesLengths = [(B,2)]
+                inp = [Single (axis "B"), Single (axis "H")]
+                , outp = [Single (axis "H"), Single (axis "B")]
+                , axesLengths = [(axis "B",2)]
                 })
         it "calculates elementary axes lengths for multiples" $
             elementaryAxesLengths' (Equation {
-                inp = [Multiple [W,C], Single H]
-                , outp = [Single W, Single C, Single H]
-                , axesLengths = [(C, 2)]
+                inp = [Multiple [axis "W", axis "C"], Single (axis "H")]
+                , outp = [Single (axis "W"), Single (axis "C"), Single (axis "H")]
+                , axesLengths = [(axis "C", 2)]
                 })
             `shouldBe`
             rearrangeElementaryAxesLengthsPy (Equation {
-                inp = [Multiple [W,C], Single H]
-                , outp = [Single W, Single C, Single H]
-                , axesLengths = [(C, 2)]
+                inp = [Multiple [axis "W", axis "C"], Single (axis "H")]
+                , outp = [Single (axis "W"), Single (axis "C"), Single (axis "H")]
+                , axesLengths = [(axis "C", 2)]
                 })
 
     hspec $ do
         it "calculates input composite axes" $
             inputCompositeAxes' (Equation {
-                inp = [Multiple [W,C], Single H]
-                , outp = [Single W, Single C, Single H]
-                , axesLengths = [(C, 2)]
+                inp = [Multiple [axis "W", axis "C"], Single (axis "H")]
+                , outp = [Single (axis "W"), Single (axis "C"), Single (axis "H")]
+                , axesLengths = [(axis "C", 2)]
                 })
             `shouldBe`
             rearrangeInputCompositeAxesPy (Equation {
-                inp = [Multiple [W,C], Single H]
-                , outp = [Single W, Single C, Single H]
-                , axesLengths = [(C, 2)]
+                inp = [Multiple [axis "W", axis "C"], Single (axis "H")]
+                , outp = [Single (axis "W"), Single (axis "C"), Single (axis "H")]
+                , axesLengths = [(axis "C", 2)]
                 })
         it "calculates more composite axes" $
             inputCompositeAxes' (Equation {
-                inp = [Single H, Multiple [W]]
-                , outp = [Single W, Single H]
-                , axesLengths = [(W, 2)]
+                inp = [Single (axis "H"), Multiple [axis "W"]]
+                , outp = [Single (axis "W"), Single (axis "H")]
+                , axesLengths = [(axis "W", 2)]
                 })
             `shouldBe`
             rearrangeInputCompositeAxesPy (Equation {
-                inp = [Single H, Multiple [W]]
-                , outp = [Single W, Single H]
-                , axesLengths = [(W, 2)]
+                inp = [Single (axis "H"), Multiple [axis "W"]]
+                , outp = [Single (axis "W"), Single (axis "H")]
+                , axesLengths = [(axis "W", 2)]
                 })
     hspec $ do
         it "calculates reduced elementary axes" $
             reducedElementaryAxes' (Equation {
-                inp = [Single B, Single H]
-                , outp = [Single B]
+                inp = [Single (axis "B"), Single (axis "H")]
+                , outp = [Single (axis "B")]
                 , axesLengths = []
                 })
             `shouldBe`
             reduceReducedElementaryAxesPy (Equation {
-                inp = [Single B, Single H]
-                , outp = [Single B]
+                inp = [Single (axis "B"), Single (axis "H")]
+                , outp = [Single (axis "B")]
                 , axesLengths = []
                 })
     hspec $ do
         it "calculates init shapes" $
             initShapes' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
             rearrangeInitShapesPy (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
 
     hspec $ do
         it "calculates reduced axes" $
             reducedAxes' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
             reduceReducedAxesPy (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
 
     hspec $ do
         it "calculates axes reordering" $
             axesReordering' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
             rearrangeAxesReorderingPy (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
         it "calculates axes reordering for reduction" $
             axesReordering' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single B, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "B"), Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
             reduceAxesReorderingPy (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single B, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "B"), Single (axis "C")]
                 , axesLengths = []
                 })
 
@@ -1088,54 +1080,54 @@ main = do
     hspec $ do
         it "calculates added axes for reconstruct" $
             addedAxesReconstruct' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
             rearrangeAddedAxesReconstructPy (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
     hspec $ do
         it "calculates final shapes" $
             finalShapes' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
             rearrangeFinalShapesPy (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Single B, Single W, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "B"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
                 })
         it "calculates final shapes for composite axes" $
             finalShapes' (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Multiple [B, W], Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Multiple [axis "B", axis "W"], Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
             Right [4,24,3]
         it "calculates final shapes for split initial axis" $
             finalShapes' (Equation {
-                inp = [Single B, Single H, Multiple [I, W], Single C]
-                , outp = [Single I, Single B, Single H, Single W, Single C]
-                , axesLengths = [(I,2)]
+                inp = [Single (axis "B"), Single (axis "H"), Multiple [axis "I", axis "W"], Single (axis "C")]
+                , outp = [Single (axis "I"), Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , axesLengths = [(axis "I",2)]
                 })
             `shouldBe`
             rearrangeFinalShapesPy (Equation {
-                inp = [Single B, Single H, Multiple [I, W], Single C]
-                , outp = [Single I, Single B, Single H, Single W, Single C]
-                , axesLengths = [(I,2)]
+                inp = [Single (axis "B"), Single (axis "H"), Multiple [axis "I", axis "W"], Single (axis "C")]
+                , outp = [Single (axis "I"), Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , axesLengths = [(axis "I",2)]
                 })
     hspec $ do
         it "generates tf commands for rearrange" $
             applyRecipe sampleShape (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single H, Multiple [B, W], Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Multiple [axis "B", axis "W"], Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
@@ -1146,8 +1138,8 @@ main = do
             ]
         it "generates tf commands for reduce" $
             applyRecipe sampleShape (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Single B, Single C]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "B"), Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
@@ -1159,8 +1151,8 @@ main = do
             ]
         it "generates tf commands for full reduce" $
             applyRecipe sampleShape (Equation {
-                inp = [Single B, Single H, Single W, Single C]
-                , outp = [Multiple [B, H, W, C]]
+                inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Multiple [axis "B", axis "H", axis "W", axis "C"]]
                 , axesLengths = []
                 })
             `shouldBe`
@@ -1171,9 +1163,9 @@ main = do
             ]
         it "generates tf commands for split initial axis" $
             applyRecipe sampleShape (Equation {
-                inp = [Single B, Single H, Multiple [I, W], Single C]
-                , outp = [Single I, Single B, Single H, Single W, Single C]
-                , axesLengths = [(I,2)]
+                inp = [Single (axis "B"), Single (axis "H"), Multiple [axis "I", axis "W"], Single (axis "C")]
+                , outp = [Single (axis "I"), Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , axesLengths = [(axis "I",2)]
                 })
             `shouldBe`
             [
@@ -1183,8 +1175,8 @@ main = do
             ]
         it "generates tf commands for different shape" $
             applyRecipe (tail sampleShape) (Equation {
-                inp = [Single H, Single W, Single C]
-                , outp = [Multiple [H, W], Single C]
+                inp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Multiple [axis "H", axis "W"], Single (axis "C")]
                 , axesLengths = []
                 })
             `shouldBe`
@@ -1207,7 +1199,7 @@ main = do
     -- print . elementaryAxesLengths' $ (Equation [] [] [(Ellipsis,0)])
     -- quickCheck $ \xs -> collect (isRight (elementaryAxesLengths' xs)) $ eitherToMaybe (elementaryAxesLengthsPy xs) === eitherToMaybe (elementaryAxesLengths' xs)
 
-    -- let xs = Equation [] [Multiple [Ellipsis]] in
+    -- let xs = Equation [] [Multiple [axis "Ellipsis"]] in
     --     print $ ellipsisPositionInLhsPy xs
 
 
