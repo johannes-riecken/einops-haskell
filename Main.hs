@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -70,19 +71,23 @@ instance Show TfCommand where
     show (Transpose xs) = printf "x = tf.transpose(x, %s)" (show xs)
     show (ExpandDims x) = printf "x = tf.expand_dims(x, %d)" x
 
-newtype Axis = Axis { getAxis :: Maybe String } deriving (Eq, Ord, Arbitrary)
+newtype Axis a = Axis { getAxis :: Maybe a } deriving (Arbitrary)
 
-axis :: String -> Axis
+axis :: String -> Axis String
 axis x = Axis (Just x)
 
-anon :: Axis
+anon :: Axis a
 anon = Axis Nothing
 
-instance Show Axis where
-    show (Axis (Just x)) = x
+instance Show a => Show (Axis a) where
+    show (Axis (Just x)) = filter (/= '"') $ show x
     show (Axis Nothing) = "()"
 
-instance ToJSON Axis where
+deriving instance Eq a => Eq (Axis a)
+
+deriving instance Ord a => Ord (Axis a)
+
+instance ToJSON a => ToJSON (Axis a) where
     toJSON (Axis (Just x)) = toJSON x
     toJSON (Axis Nothing) = toJSON ("()" :: String)
 
@@ -170,518 +175,519 @@ type AddedAxesReconstructRet = Map Int Int
 type FinalShapesRet = [Int]
 
 -- AUTOGEN BEGIN
-addedAxes' :: Equation Axis -> Either BS.ByteString AddedAxesRet
+addedAxes' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString AddedAxesRet
 addedAxes' = fmap addedAxes . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeAddedAxesAPI = "/rearrange/added_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesRet
+type RearrangeAddedAxesAPI a = "/rearrange/added_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AddedAxesRet
 
-rearrangeAddedAxesAPI :: Proxy RearrangeAddedAxesAPI
+rearrangeAddedAxesAPI :: Proxy (RearrangeAddedAxesAPI a)
 rearrangeAddedAxesAPI = Proxy
 
-rearrangeAddedAxesRequest :: EquationStr Axis -> ClientM AddedAxesRet
+rearrangeAddedAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AddedAxesRet
 rearrangeAddedAxesRequest = client rearrangeAddedAxesAPI
 
-rearrangeAddedAxesPy :: Equation Axis -> Either BS.ByteString AddedAxesRet
+rearrangeAddedAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AddedAxesRet
 rearrangeAddedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeAddedAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceAddedAxesAPI = "/reduce/added_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesRet
+type ReduceAddedAxesAPI a = "/reduce/added_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AddedAxesRet
 
-reduceAddedAxesAPI :: Proxy ReduceAddedAxesAPI
+reduceAddedAxesAPI :: Proxy (ReduceAddedAxesAPI a)
 reduceAddedAxesAPI = Proxy
 
-reduceAddedAxesRequest :: EquationStr Axis -> ClientM AddedAxesRet
+reduceAddedAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AddedAxesRet
 reduceAddedAxesRequest = client reduceAddedAxesAPI
 
-reduceAddedAxesPy :: Equation Axis -> Either BS.ByteString AddedAxesRet
+reduceAddedAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AddedAxesRet
 reduceAddedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceAddedAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatAddedAxesAPI = "/repeat/added_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesRet
+type RepeatAddedAxesAPI a = "/repeat/added_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AddedAxesRet
 
-repeatAddedAxesAPI :: Proxy RepeatAddedAxesAPI
+repeatAddedAxesAPI :: Proxy (RepeatAddedAxesAPI a)
 repeatAddedAxesAPI = Proxy
 
-repeatAddedAxesRequest :: EquationStr Axis -> ClientM AddedAxesRet
+repeatAddedAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AddedAxesRet
 repeatAddedAxesRequest = client repeatAddedAxesAPI
 
-repeatAddedAxesPy :: Equation Axis -> Either BS.ByteString AddedAxesRet
+repeatAddedAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AddedAxesRet
 repeatAddedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatAddedAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-axesPermutation' :: Equation Axis -> Either BS.ByteString AxesPermutationRet
+axesPermutation' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString AxesPermutationRet
 axesPermutation' = fmap axesPermutation . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeAxesPermutationAPI = "/rearrange/axes_permutation" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesPermutationRet
+type RearrangeAxesPermutationAPI a = "/rearrange/axes_permutation" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AxesPermutationRet
 
-rearrangeAxesPermutationAPI :: Proxy RearrangeAxesPermutationAPI
+rearrangeAxesPermutationAPI :: Proxy (RearrangeAxesPermutationAPI a)
 rearrangeAxesPermutationAPI = Proxy
 
-rearrangeAxesPermutationRequest :: EquationStr Axis -> ClientM AxesPermutationRet
+rearrangeAxesPermutationRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AxesPermutationRet
 rearrangeAxesPermutationRequest = client rearrangeAxesPermutationAPI
 
-rearrangeAxesPermutationPy :: Equation Axis -> Either BS.ByteString AxesPermutationRet
+rearrangeAxesPermutationPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AxesPermutationRet
 rearrangeAxesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeAxesPermutationRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceAxesPermutationAPI = "/reduce/axes_permutation" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesPermutationRet
+type ReduceAxesPermutationAPI a = "/reduce/axes_permutation" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AxesPermutationRet
 
-reduceAxesPermutationAPI :: Proxy ReduceAxesPermutationAPI
+reduceAxesPermutationAPI :: Proxy (ReduceAxesPermutationAPI a)
 reduceAxesPermutationAPI = Proxy
 
-reduceAxesPermutationRequest :: EquationStr Axis -> ClientM AxesPermutationRet
+reduceAxesPermutationRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AxesPermutationRet
 reduceAxesPermutationRequest = client reduceAxesPermutationAPI
 
-reduceAxesPermutationPy :: Equation Axis -> Either BS.ByteString AxesPermutationRet
+reduceAxesPermutationPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AxesPermutationRet
 reduceAxesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceAxesPermutationRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatAxesPermutationAPI = "/repeat/axes_permutation" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesPermutationRet
+type RepeatAxesPermutationAPI a = "/repeat/axes_permutation" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AxesPermutationRet
 
-repeatAxesPermutationAPI :: Proxy RepeatAxesPermutationAPI
+repeatAxesPermutationAPI :: Proxy (RepeatAxesPermutationAPI a)
 repeatAxesPermutationAPI = Proxy
 
-repeatAxesPermutationRequest :: EquationStr Axis -> ClientM AxesPermutationRet
+repeatAxesPermutationRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AxesPermutationRet
 repeatAxesPermutationRequest = client repeatAxesPermutationAPI
 
-repeatAxesPermutationPy :: Equation Axis -> Either BS.ByteString AxesPermutationRet
+repeatAxesPermutationPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AxesPermutationRet
 repeatAxesPermutationPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatAxesPermutationRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-elementaryAxesLengths' :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
+elementaryAxesLengths' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString ElementaryAxesLengthsRet
 elementaryAxesLengths' = fmap elementaryAxesLengths . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeElementaryAxesLengthsAPI = "/rearrange/elementary_axes_lengths" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ElementaryAxesLengthsRet
+type RearrangeElementaryAxesLengthsAPI a = "/rearrange/elementary_axes_lengths" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ElementaryAxesLengthsRet
 
-rearrangeElementaryAxesLengthsAPI :: Proxy RearrangeElementaryAxesLengthsAPI
+rearrangeElementaryAxesLengthsAPI :: Proxy (RearrangeElementaryAxesLengthsAPI a)
 rearrangeElementaryAxesLengthsAPI = Proxy
 
-rearrangeElementaryAxesLengthsRequest :: EquationStr Axis -> ClientM ElementaryAxesLengthsRet
+rearrangeElementaryAxesLengthsRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ElementaryAxesLengthsRet
 rearrangeElementaryAxesLengthsRequest = client rearrangeElementaryAxesLengthsAPI
 
-rearrangeElementaryAxesLengthsPy :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
+rearrangeElementaryAxesLengthsPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ElementaryAxesLengthsRet
 rearrangeElementaryAxesLengthsPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeElementaryAxesLengthsRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceElementaryAxesLengthsAPI = "/reduce/elementary_axes_lengths" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ElementaryAxesLengthsRet
+type ReduceElementaryAxesLengthsAPI a = "/reduce/elementary_axes_lengths" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ElementaryAxesLengthsRet
 
-reduceElementaryAxesLengthsAPI :: Proxy ReduceElementaryAxesLengthsAPI
+reduceElementaryAxesLengthsAPI :: Proxy (ReduceElementaryAxesLengthsAPI a)
 reduceElementaryAxesLengthsAPI = Proxy
 
-reduceElementaryAxesLengthsRequest :: EquationStr Axis -> ClientM ElementaryAxesLengthsRet
+reduceElementaryAxesLengthsRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ElementaryAxesLengthsRet
 reduceElementaryAxesLengthsRequest = client reduceElementaryAxesLengthsAPI
 
-reduceElementaryAxesLengthsPy :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
+reduceElementaryAxesLengthsPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ElementaryAxesLengthsRet
 reduceElementaryAxesLengthsPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceElementaryAxesLengthsRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatElementaryAxesLengthsAPI = "/repeat/elementary_axes_lengths" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ElementaryAxesLengthsRet
+type RepeatElementaryAxesLengthsAPI a = "/repeat/elementary_axes_lengths" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ElementaryAxesLengthsRet
 
-repeatElementaryAxesLengthsAPI :: Proxy RepeatElementaryAxesLengthsAPI
+repeatElementaryAxesLengthsAPI :: Proxy (RepeatElementaryAxesLengthsAPI a)
 repeatElementaryAxesLengthsAPI = Proxy
 
-repeatElementaryAxesLengthsRequest :: EquationStr Axis -> ClientM ElementaryAxesLengthsRet
+repeatElementaryAxesLengthsRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ElementaryAxesLengthsRet
 repeatElementaryAxesLengthsRequest = client repeatElementaryAxesLengthsAPI
 
-repeatElementaryAxesLengthsPy :: Equation Axis -> Either BS.ByteString ElementaryAxesLengthsRet
+repeatElementaryAxesLengthsPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ElementaryAxesLengthsRet
 repeatElementaryAxesLengthsPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatElementaryAxesLengthsRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-inputCompositeAxes' :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
+inputCompositeAxes' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString InputCompositeAxesRet
 inputCompositeAxes' = fmap inputCompositeAxes . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeInputCompositeAxesAPI = "/rearrange/input_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InputCompositeAxesRet
+type RearrangeInputCompositeAxesAPI a = "/rearrange/input_composite_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] InputCompositeAxesRet
 
-rearrangeInputCompositeAxesAPI :: Proxy RearrangeInputCompositeAxesAPI
+rearrangeInputCompositeAxesAPI :: Proxy (RearrangeInputCompositeAxesAPI a)
 rearrangeInputCompositeAxesAPI = Proxy
 
-rearrangeInputCompositeAxesRequest :: EquationStr Axis -> ClientM InputCompositeAxesRet
+rearrangeInputCompositeAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM InputCompositeAxesRet
 rearrangeInputCompositeAxesRequest = client rearrangeInputCompositeAxesAPI
 
-rearrangeInputCompositeAxesPy :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
+rearrangeInputCompositeAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString InputCompositeAxesRet
 rearrangeInputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeInputCompositeAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceInputCompositeAxesAPI = "/reduce/input_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InputCompositeAxesRet
+type ReduceInputCompositeAxesAPI a = "/reduce/input_composite_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] InputCompositeAxesRet
 
-reduceInputCompositeAxesAPI :: Proxy ReduceInputCompositeAxesAPI
+reduceInputCompositeAxesAPI :: Proxy (ReduceInputCompositeAxesAPI a)
 reduceInputCompositeAxesAPI = Proxy
 
-reduceInputCompositeAxesRequest :: EquationStr Axis -> ClientM InputCompositeAxesRet
+reduceInputCompositeAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM InputCompositeAxesRet
 reduceInputCompositeAxesRequest = client reduceInputCompositeAxesAPI
 
-reduceInputCompositeAxesPy :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
+reduceInputCompositeAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString InputCompositeAxesRet
 reduceInputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceInputCompositeAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatInputCompositeAxesAPI = "/repeat/input_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InputCompositeAxesRet
+type RepeatInputCompositeAxesAPI a = "/repeat/input_composite_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] InputCompositeAxesRet
 
-repeatInputCompositeAxesAPI :: Proxy RepeatInputCompositeAxesAPI
+repeatInputCompositeAxesAPI :: Proxy (RepeatInputCompositeAxesAPI a)
 repeatInputCompositeAxesAPI = Proxy
 
-repeatInputCompositeAxesRequest :: EquationStr Axis -> ClientM InputCompositeAxesRet
+repeatInputCompositeAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM InputCompositeAxesRet
 repeatInputCompositeAxesRequest = client repeatInputCompositeAxesAPI
 
-repeatInputCompositeAxesPy :: Equation Axis -> Either BS.ByteString InputCompositeAxesRet
+repeatInputCompositeAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString InputCompositeAxesRet
 repeatInputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatInputCompositeAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-outputCompositeAxes' :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
+outputCompositeAxes' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString OutputCompositeAxesRet
 outputCompositeAxes' = fmap outputCompositeAxes . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeOutputCompositeAxesAPI = "/rearrange/output_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] OutputCompositeAxesRet
+type RearrangeOutputCompositeAxesAPI a = "/rearrange/output_composite_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] OutputCompositeAxesRet
 
-rearrangeOutputCompositeAxesAPI :: Proxy RearrangeOutputCompositeAxesAPI
+rearrangeOutputCompositeAxesAPI :: Proxy (RearrangeOutputCompositeAxesAPI a)
 rearrangeOutputCompositeAxesAPI = Proxy
 
-rearrangeOutputCompositeAxesRequest :: EquationStr Axis -> ClientM OutputCompositeAxesRet
+rearrangeOutputCompositeAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM OutputCompositeAxesRet
 rearrangeOutputCompositeAxesRequest = client rearrangeOutputCompositeAxesAPI
 
-rearrangeOutputCompositeAxesPy :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
+rearrangeOutputCompositeAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString OutputCompositeAxesRet
 rearrangeOutputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeOutputCompositeAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceOutputCompositeAxesAPI = "/reduce/output_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] OutputCompositeAxesRet
+type ReduceOutputCompositeAxesAPI a = "/reduce/output_composite_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] OutputCompositeAxesRet
 
-reduceOutputCompositeAxesAPI :: Proxy ReduceOutputCompositeAxesAPI
+reduceOutputCompositeAxesAPI :: Proxy (ReduceOutputCompositeAxesAPI a)
 reduceOutputCompositeAxesAPI = Proxy
 
-reduceOutputCompositeAxesRequest :: EquationStr Axis -> ClientM OutputCompositeAxesRet
+reduceOutputCompositeAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM OutputCompositeAxesRet
 reduceOutputCompositeAxesRequest = client reduceOutputCompositeAxesAPI
 
-reduceOutputCompositeAxesPy :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
+reduceOutputCompositeAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString OutputCompositeAxesRet
 reduceOutputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceOutputCompositeAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatOutputCompositeAxesAPI = "/repeat/output_composite_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] OutputCompositeAxesRet
+type RepeatOutputCompositeAxesAPI a = "/repeat/output_composite_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] OutputCompositeAxesRet
 
-repeatOutputCompositeAxesAPI :: Proxy RepeatOutputCompositeAxesAPI
+repeatOutputCompositeAxesAPI :: Proxy (RepeatOutputCompositeAxesAPI a)
 repeatOutputCompositeAxesAPI = Proxy
 
-repeatOutputCompositeAxesRequest :: EquationStr Axis -> ClientM OutputCompositeAxesRet
+repeatOutputCompositeAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM OutputCompositeAxesRet
 repeatOutputCompositeAxesRequest = client repeatOutputCompositeAxesAPI
 
-repeatOutputCompositeAxesPy :: Equation Axis -> Either BS.ByteString OutputCompositeAxesRet
+repeatOutputCompositeAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString OutputCompositeAxesRet
 repeatOutputCompositeAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatOutputCompositeAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-reducedElementaryAxes' :: Equation Axis -> Either BS.ByteString ReducedElementaryAxesRet
+reducedElementaryAxes' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString ReducedElementaryAxesRet
 reducedElementaryAxes' = fmap reducedElementaryAxes . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeReducedElementaryAxesAPI = "/rearrange/reduced_elementary_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedElementaryAxesRet
+type RearrangeReducedElementaryAxesAPI a = "/rearrange/reduced_elementary_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ReducedElementaryAxesRet
 
-rearrangeReducedElementaryAxesAPI :: Proxy RearrangeReducedElementaryAxesAPI
+rearrangeReducedElementaryAxesAPI :: Proxy (RearrangeReducedElementaryAxesAPI a)
 rearrangeReducedElementaryAxesAPI = Proxy
 
-rearrangeReducedElementaryAxesRequest :: EquationStr Axis -> ClientM ReducedElementaryAxesRet
+rearrangeReducedElementaryAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ReducedElementaryAxesRet
 rearrangeReducedElementaryAxesRequest = client rearrangeReducedElementaryAxesAPI
 
-rearrangeReducedElementaryAxesPy :: Equation Axis -> Either BS.ByteString ReducedElementaryAxesRet
+rearrangeReducedElementaryAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ReducedElementaryAxesRet
 rearrangeReducedElementaryAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeReducedElementaryAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceReducedElementaryAxesAPI = "/reduce/reduced_elementary_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedElementaryAxesRet
+type ReduceReducedElementaryAxesAPI a = "/reduce/reduced_elementary_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ReducedElementaryAxesRet
 
-reduceReducedElementaryAxesAPI :: Proxy ReduceReducedElementaryAxesAPI
+reduceReducedElementaryAxesAPI :: Proxy (ReduceReducedElementaryAxesAPI a)
 reduceReducedElementaryAxesAPI = Proxy
 
-reduceReducedElementaryAxesRequest :: EquationStr Axis -> ClientM ReducedElementaryAxesRet
+reduceReducedElementaryAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ReducedElementaryAxesRet
 reduceReducedElementaryAxesRequest = client reduceReducedElementaryAxesAPI
 
-reduceReducedElementaryAxesPy :: Equation Axis -> Either BS.ByteString ReducedElementaryAxesRet
+reduceReducedElementaryAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ReducedElementaryAxesRet
 reduceReducedElementaryAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceReducedElementaryAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatReducedElementaryAxesAPI = "/repeat/reduced_elementary_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedElementaryAxesRet
+type RepeatReducedElementaryAxesAPI a = "/repeat/reduced_elementary_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ReducedElementaryAxesRet
 
-repeatReducedElementaryAxesAPI :: Proxy RepeatReducedElementaryAxesAPI
+repeatReducedElementaryAxesAPI :: Proxy (RepeatReducedElementaryAxesAPI a)
 repeatReducedElementaryAxesAPI = Proxy
 
-repeatReducedElementaryAxesRequest :: EquationStr Axis -> ClientM ReducedElementaryAxesRet
+repeatReducedElementaryAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ReducedElementaryAxesRet
 repeatReducedElementaryAxesRequest = client repeatReducedElementaryAxesAPI
 
-repeatReducedElementaryAxesPy :: Equation Axis -> Either BS.ByteString ReducedElementaryAxesRet
+repeatReducedElementaryAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ReducedElementaryAxesRet
 repeatReducedElementaryAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatReducedElementaryAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
+
 -- AUTOGEN END
 
 -- RECONSTRUCT AUTOGEN BEGIN
-initShapes' :: Equation Axis -> Either BS.ByteString InitShapesRet
+initShapes' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString InitShapesRet
 initShapes' = fmap initShapes . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeInitShapesAPI = "/rearrange/init_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InitShapesRet
+type RearrangeInitShapesAPI a = "/rearrange/init_shapes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] InitShapesRet
 
-rearrangeInitShapesAPI :: Proxy RearrangeInitShapesAPI
+rearrangeInitShapesAPI :: Proxy (RearrangeInitShapesAPI a)
 rearrangeInitShapesAPI = Proxy
 
-rearrangeInitShapesRequest :: EquationStr Axis -> ClientM InitShapesRet
+rearrangeInitShapesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM InitShapesRet
 rearrangeInitShapesRequest = client rearrangeInitShapesAPI
 
-rearrangeInitShapesPy :: Equation Axis -> Either BS.ByteString InitShapesRet
+rearrangeInitShapesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString InitShapesRet
 rearrangeInitShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeInitShapesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceInitShapesAPI = "/reduce/init_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InitShapesRet
+type ReduceInitShapesAPI a = "/reduce/init_shapes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] InitShapesRet
 
-reduceInitShapesAPI :: Proxy ReduceInitShapesAPI
+reduceInitShapesAPI :: Proxy (ReduceInitShapesAPI a)
 reduceInitShapesAPI = Proxy
 
-reduceInitShapesRequest :: EquationStr Axis -> ClientM InitShapesRet
+reduceInitShapesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM InitShapesRet
 reduceInitShapesRequest = client reduceInitShapesAPI
 
-reduceInitShapesPy :: Equation Axis -> Either BS.ByteString InitShapesRet
+reduceInitShapesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString InitShapesRet
 reduceInitShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceInitShapesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatInitShapesAPI = "/repeat/init_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] InitShapesRet
+type RepeatInitShapesAPI a = "/repeat/init_shapes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] InitShapesRet
 
-repeatInitShapesAPI :: Proxy RepeatInitShapesAPI
+repeatInitShapesAPI :: Proxy (RepeatInitShapesAPI a)
 repeatInitShapesAPI = Proxy
 
-repeatInitShapesRequest :: EquationStr Axis -> ClientM InitShapesRet
+repeatInitShapesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM InitShapesRet
 repeatInitShapesRequest = client repeatInitShapesAPI
 
-repeatInitShapesPy :: Equation Axis -> Either BS.ByteString InitShapesRet
+repeatInitShapesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString InitShapesRet
 repeatInitShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatInitShapesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-reducedAxes' :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+reducedAxes' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString ReducedAxesRet
 reducedAxes' = fmap reducedAxes . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeReducedAxesAPI = "/rearrange/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+type RearrangeReducedAxesAPI a = "/rearrange/reduced_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ReducedAxesRet
 
-rearrangeReducedAxesAPI :: Proxy RearrangeReducedAxesAPI
+rearrangeReducedAxesAPI :: Proxy (RearrangeReducedAxesAPI a)
 rearrangeReducedAxesAPI = Proxy
 
-rearrangeReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+rearrangeReducedAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ReducedAxesRet
 rearrangeReducedAxesRequest = client rearrangeReducedAxesAPI
 
-rearrangeReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+rearrangeReducedAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ReducedAxesRet
 rearrangeReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeReducedAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceReducedAxesAPI = "/reduce/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+type ReduceReducedAxesAPI a = "/reduce/reduced_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ReducedAxesRet
 
-reduceReducedAxesAPI :: Proxy ReduceReducedAxesAPI
+reduceReducedAxesAPI :: Proxy (ReduceReducedAxesAPI a)
 reduceReducedAxesAPI = Proxy
 
-reduceReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+reduceReducedAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ReducedAxesRet
 reduceReducedAxesRequest = client reduceReducedAxesAPI
 
-reduceReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+reduceReducedAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ReducedAxesRet
 reduceReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceReducedAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatReducedAxesAPI = "/repeat/reduced_axes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] ReducedAxesRet
+type RepeatReducedAxesAPI a = "/repeat/reduced_axes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] ReducedAxesRet
 
-repeatReducedAxesAPI :: Proxy RepeatReducedAxesAPI
+repeatReducedAxesAPI :: Proxy (RepeatReducedAxesAPI a)
 repeatReducedAxesAPI = Proxy
 
-repeatReducedAxesRequest :: EquationStr Axis -> ClientM ReducedAxesRet
+repeatReducedAxesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM ReducedAxesRet
 repeatReducedAxesRequest = client repeatReducedAxesAPI
 
-repeatReducedAxesPy :: Equation Axis -> Either BS.ByteString ReducedAxesRet
+repeatReducedAxesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString ReducedAxesRet
 repeatReducedAxesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatReducedAxesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-axesReordering' :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+axesReordering' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString AxesReorderingRet
 axesReordering' = fmap axesReordering . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeAxesReorderingAPI = "/rearrange/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+type RearrangeAxesReorderingAPI a = "/rearrange/axes_reordering" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AxesReorderingRet
 
-rearrangeAxesReorderingAPI :: Proxy RearrangeAxesReorderingAPI
+rearrangeAxesReorderingAPI :: Proxy (RearrangeAxesReorderingAPI a)
 rearrangeAxesReorderingAPI = Proxy
 
-rearrangeAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+rearrangeAxesReorderingRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AxesReorderingRet
 rearrangeAxesReorderingRequest = client rearrangeAxesReorderingAPI
 
-rearrangeAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+rearrangeAxesReorderingPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AxesReorderingRet
 rearrangeAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeAxesReorderingRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceAxesReorderingAPI = "/reduce/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+type ReduceAxesReorderingAPI a = "/reduce/axes_reordering" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AxesReorderingRet
 
-reduceAxesReorderingAPI :: Proxy ReduceAxesReorderingAPI
+reduceAxesReorderingAPI :: Proxy (ReduceAxesReorderingAPI a)
 reduceAxesReorderingAPI = Proxy
 
-reduceAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+reduceAxesReorderingRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AxesReorderingRet
 reduceAxesReorderingRequest = client reduceAxesReorderingAPI
 
-reduceAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+reduceAxesReorderingPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AxesReorderingRet
 reduceAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceAxesReorderingRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatAxesReorderingAPI = "/repeat/axes_reordering" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AxesReorderingRet
+type RepeatAxesReorderingAPI a = "/repeat/axes_reordering" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AxesReorderingRet
 
-repeatAxesReorderingAPI :: Proxy RepeatAxesReorderingAPI
+repeatAxesReorderingAPI :: Proxy (RepeatAxesReorderingAPI a)
 repeatAxesReorderingAPI = Proxy
 
-repeatAxesReorderingRequest :: EquationStr Axis -> ClientM AxesReorderingRet
+repeatAxesReorderingRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AxesReorderingRet
 repeatAxesReorderingRequest = client repeatAxesReorderingAPI
 
-repeatAxesReorderingPy :: Equation Axis -> Either BS.ByteString AxesReorderingRet
+repeatAxesReorderingPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AxesReorderingRet
 repeatAxesReorderingPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatAxesReorderingRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-addedAxesReconstruct' :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+addedAxesReconstruct' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString AddedAxesReconstructRet
 addedAxesReconstruct' = fmap addedAxesReconstruct . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeAddedAxesReconstructAPI = "/rearrange/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+type RearrangeAddedAxesReconstructAPI a = "/rearrange/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AddedAxesReconstructRet
 
-rearrangeAddedAxesReconstructAPI :: Proxy RearrangeAddedAxesReconstructAPI
+rearrangeAddedAxesReconstructAPI :: Proxy (RearrangeAddedAxesReconstructAPI a)
 rearrangeAddedAxesReconstructAPI = Proxy
 
-rearrangeAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+rearrangeAddedAxesReconstructRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AddedAxesReconstructRet
 rearrangeAddedAxesReconstructRequest = client rearrangeAddedAxesReconstructAPI
 
-rearrangeAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+rearrangeAddedAxesReconstructPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AddedAxesReconstructRet
 rearrangeAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceAddedAxesReconstructAPI = "/reduce/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+type ReduceAddedAxesReconstructAPI a = "/reduce/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AddedAxesReconstructRet
 
-reduceAddedAxesReconstructAPI :: Proxy ReduceAddedAxesReconstructAPI
+reduceAddedAxesReconstructAPI :: Proxy (ReduceAddedAxesReconstructAPI a)
 reduceAddedAxesReconstructAPI = Proxy
 
-reduceAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+reduceAddedAxesReconstructRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AddedAxesReconstructRet
 reduceAddedAxesReconstructRequest = client reduceAddedAxesReconstructAPI
 
-reduceAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+reduceAddedAxesReconstructPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AddedAxesReconstructRet
 reduceAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatAddedAxesReconstructAPI = "/repeat/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] AddedAxesReconstructRet
+type RepeatAddedAxesReconstructAPI a = "/repeat/added_axes_reconstruct" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] AddedAxesReconstructRet
 
-repeatAddedAxesReconstructAPI :: Proxy RepeatAddedAxesReconstructAPI
+repeatAddedAxesReconstructAPI :: Proxy (RepeatAddedAxesReconstructAPI a)
 repeatAddedAxesReconstructAPI = Proxy
 
-repeatAddedAxesReconstructRequest :: EquationStr Axis -> ClientM AddedAxesReconstructRet
+repeatAddedAxesReconstructRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM AddedAxesReconstructRet
 repeatAddedAxesReconstructRequest = client repeatAddedAxesReconstructAPI
 
-repeatAddedAxesReconstructPy :: Equation Axis -> Either BS.ByteString AddedAxesReconstructRet
+repeatAddedAxesReconstructPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString AddedAxesReconstructRet
 repeatAddedAxesReconstructPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatAddedAxesReconstructRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-finalShapes' :: Equation Axis -> Either BS.ByteString FinalShapesRet
+finalShapes' :: (Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString FinalShapesRet
 finalShapes' = fmap finalShapes . (checkDuplDim <=< checkRightDuplDim)
 
-type RearrangeFinalShapesAPI = "/rearrange/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+type RearrangeFinalShapesAPI a = "/rearrange/final_shapes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] FinalShapesRet
 
-rearrangeFinalShapesAPI :: Proxy RearrangeFinalShapesAPI
+rearrangeFinalShapesAPI :: Proxy (RearrangeFinalShapesAPI a)
 rearrangeFinalShapesAPI = Proxy
 
-rearrangeFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+rearrangeFinalShapesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM FinalShapesRet
 rearrangeFinalShapesRequest = client rearrangeFinalShapesAPI
 
-rearrangeFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+rearrangeFinalShapesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString FinalShapesRet
 rearrangeFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (rearrangeFinalShapesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type ReduceFinalShapesAPI = "/reduce/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+type ReduceFinalShapesAPI a = "/reduce/final_shapes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] FinalShapesRet
 
-reduceFinalShapesAPI :: Proxy ReduceFinalShapesAPI
+reduceFinalShapesAPI :: Proxy (ReduceFinalShapesAPI a)
 reduceFinalShapesAPI = Proxy
 
-reduceFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+reduceFinalShapesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM FinalShapesRet
 reduceFinalShapesRequest = client reduceFinalShapesAPI
 
-reduceFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+reduceFinalShapesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString FinalShapesRet
 reduceFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (reduceFinalShapesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
-type RepeatFinalShapesAPI = "/repeat/final_shapes" :> ReqBody '[JSON] (EquationStr Axis) :> Post '[JSON] FinalShapesRet
+type RepeatFinalShapesAPI a = "/repeat/final_shapes" :> ReqBody '[JSON] (EquationStr (Axis a)) :> Post '[JSON] FinalShapesRet
 
-repeatFinalShapesAPI :: Proxy RepeatFinalShapesAPI
+repeatFinalShapesAPI :: Proxy (RepeatFinalShapesAPI a)
 repeatFinalShapesAPI = Proxy
 
-repeatFinalShapesRequest :: EquationStr Axis -> ClientM FinalShapesRet
+repeatFinalShapesRequest :: (Show a,ToJSON a) => EquationStr (Axis a) -> ClientM FinalShapesRet
 repeatFinalShapesRequest = client repeatFinalShapesAPI
 
-repeatFinalShapesPy :: Equation Axis -> Either BS.ByteString FinalShapesRet
+repeatFinalShapesPy :: (Show a,ToJSON a) => Equation (Axis a) -> Either BS.ByteString FinalShapesRet
 repeatFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
     mngr <- newManager defaultManagerSettings
     runClientM (repeatFinalShapesRequest . eqnToEqnStr $ xs) (
         mkClientEnv mngr (BaseUrl Http "127.0.0.1" 5000 ""))
 
 
-
 -- RECONSTRUCT AUTOGEN END
 intersectCompLists :: Ord a => [Composite a] -> [Composite a] -> [Composite a]
 intersectCompLists xs ys = uncc $ mapMaybe (\x -> if x `elem` cc ys then Just x else Nothing) (cc xs)
 
-axisNumsFromCompList :: Ord a => [Composite a] -> M.Map a Int
+axisNumsFromCompList :: Ord a => [Composite (Axis a)] -> M.Map (Axis a) Int
 axisNumsFromCompList = snd . foldl' (\(i,acc) x ->
+        if x == Axis Nothing then (i,acc) else
         if M.member x acc then (i,acc) else
         (i+1,M.insertWith (\a b -> error "no duplicates allowed") x i acc))
         (0,M.empty) . cc
 
 -- axesPermutation gives the numbers of flatten output axes
-axesPermutation :: (Show a,Ord a) => Equation a -> [Int]
+axesPermutation :: Ord a => Equation (Axis a) -> [Int]
 axesPermutation (Equation{..}) = let
     axisNums = axisNumsFromCompList (intersectCompLists inp outp)
     in
@@ -690,25 +696,25 @@ axesPermutation (Equation{..}) = let
 -- addedAxes given equation returns a map from axes numbers to repeat counts
 -- Example: addedAxes "h w -> h w 3" is {2: 3}
 -- TODO: Add integer type to Axis datatype
-addedAxes :: Equation Axis -> AddedAxesRet
+addedAxes :: Equation (Axis a) -> AddedAxesRet
 addedAxes _ = []  -- TODO: implement
 
 -- example: reducedElementaryAxes "h w -> h" "max" is [1]
-reducedElementaryAxes :: (Show a,Ord a) => Equation a -> ReducedElementaryAxesRet
+reducedElementaryAxes :: Ord a => Equation (Axis a) -> ReducedElementaryAxesRet
 reducedElementaryAxes (Equation{..}) = let
     axisNums = axisNumsFromCompList inp
     in
     map (axisNums M.!) $ flatten inp \\ flatten outp
 
-outputCompositeAxes :: Equation Axis -> OutputCompositeAxesRet
+outputCompositeAxes :: Ord a => Equation (Axis a) -> OutputCompositeAxesRet
 outputCompositeAxes eqn@(Equation{..}) = let
     axisNums = axisNumsFromCompList inp
     in
     map (F.toList . fmap (axisNums M.!)) outp
 
-elementaryAxesLengths :: Equation Axis -> ElementaryAxesLengthsRet
+elementaryAxesLengths :: Ord a => Equation (Axis a) -> ElementaryAxesLengthsRet
 elementaryAxesLengths eqn@Equation{..} = let m = M.fromList axesLengths in
-    foldr ((:) . (`M.lookup` m)) [] . cc $ inp
+    foldr (\x acc -> if x == Axis Nothing then acc else ((:) . (`M.lookup` m)) x acc) [] . cc $ inp
 
 -- unexported helper from Data.List
 select :: (a -> Bool) -> a -> ([a], [a]) -> ([a], [a])
@@ -717,7 +723,7 @@ select p x ~(ts,fs) | p x       = (x:ts,fs)
 
 -- inputCompositeAxes returns a list that for each composite axis returns its
 -- tuple of known and unknown axis numbers
-inputCompositeAxes :: Equation Axis -> [([Int],[Int])]
+inputCompositeAxes :: Ord a => Equation (Axis a) -> [([Int],[Int])]
 inputCompositeAxes eqn@Equation{..} =
     let
         axisNums = axisNumsFromCompList inp
@@ -728,54 +734,53 @@ inputCompositeAxes eqn@Equation{..} =
 
 -- TODO: fuse
 -- TODO: allow deeper nesting of Composite
-initMap :: Equation Axis -> [Int] -> Map Axis Int
+initMap :: Ord a => Equation (Axis a) -> [Int] -> Map (Axis a) Int
 initMap eqn@Equation{..} shape =
     let
     sizes = M.fromList . snd $ foldr (\x' (i,acc) -> case x' of
             Single x -> (i-1,(x, shape !! i):acc)
             Multiple xs -> (i-1,handleMultiple i xs ++ acc)
             ) (length inp - 1,[]) inp
-    handleMultiple :: Int -> [Axis] -> [(Axis,Int)]
     handleMultiple i xs = map (\x -> if x `M.member` axesLengthsMap then
-        (x,axesLengthsMap M.! x) :: (Axis,Int)
+        (x,axesLengthsMap M.! x)
         else
-        (x,shape !! i `div` prod xs) :: (Axis,Int)
+        (x,shape !! i `div` prod xs)
         ) xs
         where
             prod = product . map (axesLengthsMap M.!) . filter (`M.member` axesLengthsMap)
     axesLengthsMap = M.fromList axesLengths
     in sizes
 
-initShapes :: Equation Axis -> InitShapesRet
+initShapes :: Ord a => Equation (Axis a) -> InitShapesRet
 initShapes = initShapesWithShape sampleShape
 
 -- TODO: fuse
-initShapesWithShape :: [Int] -> Equation Axis -> InitShapesRet
+initShapesWithShape :: Ord a => [Int] -> Equation (Axis a) -> InitShapesRet
 initShapesWithShape shape eqn@Equation{..} = map (initMap eqn shape M.!) (flatten inp)
 
 -- TODO: remove
-reducedAxes :: Equation Axis -> ReducedAxesRet
+reducedAxes :: Ord a => Equation (Axis a) -> ReducedAxesRet
 reducedAxes = reducedElementaryAxes
 
 -- TODO: remove
-axesReordering :: Equation Axis -> AxesReorderingRet
+axesReordering :: Ord a => Equation (Axis a) -> AxesReorderingRet
 axesReordering = axesPermutation
 
 -- TODO: implement
-addedAxesReconstruct :: Equation Axis -> AddedAxesReconstructRet
+addedAxesReconstruct :: Equation (Axis a) -> AddedAxesReconstructRet
 addedAxesReconstruct _ = M.empty
 
-finalShapes :: Equation Axis -> FinalShapesRet
+finalShapes :: Ord a => Equation (Axis a) -> FinalShapesRet
 finalShapes = finalShapesWithShape sampleShape
 
 -- TODO: allow deeper nesting
 -- TODO: fuse
-finalShapesWithShape :: [Int] -> Equation Axis -> FinalShapesRet
+finalShapesWithShape :: Ord a => [Int] -> Equation (Axis a) -> FinalShapesRet
 finalShapesWithShape shape eqn@Equation{..} = map (foldr ((*) . (initMap eqn shape M.!)) 1) outp
 -- end of reconstruct
 
 -- TODO: Generalize reduction type
-applyRecipe :: [Int] -> Equation Axis -> [TfCommand]
+applyRecipe :: Ord a => [Int] -> Equation (Axis a) -> [TfCommand]
 applyRecipe shape eqn@Equation{..} = let
     x = initShapesWithShape shape eqn
     y = reducedAxes eqn
@@ -820,6 +825,10 @@ newtype CC a = CC (Compose [] Composite a) deriving (Functor, Foldable, Traversa
 cc :: [Composite a] -> CC a
 cc = CC . Compose
 
+-- newtype CCC m a = CCC (Compose [] (Compose [] (Axis a)
+
+-- cc :: [Composite Axis] -> CCC a deriving (Functor, Foldable, Traversable, Applicative, Alternative)
+
 uncc :: CC a -> [Composite a]
 uncc (CC (Compose x)) = x
 
@@ -838,7 +847,7 @@ instance Filterable CC where
 
 instance Witherable CC
 
-fixup :: Equation Axis -> Equation Axis
+fixup :: (Show a,Ord a) => Equation (Axis a) -> Equation (Axis a)
 fixup eqn@Equation{..} = let
     inp' = uncc . remDupl . cc $ inp
     outp' = uncc . remDupl . cc $ outp
@@ -847,12 +856,12 @@ fixup eqn@Equation{..} = let
 remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
 remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
 
-remDupl' :: [Composite Axis] -> [Composite Axis]
+remDupl' :: (Show a,Ord a) => [Composite (Axis a)] -> [Composite (Axis a)]
 remDupl' = uncc . remDupl . cc
 
 -- TODO: check this if operation is rearrange
 -- checkOneSideIdent :: (Show (f a),Eq (f a),Foldable f) => Equation (f a) -> Either String (Equation (f a))
-checkOneSideIdent :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkOneSideIdent :: (Eq a,Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString (Equation (Axis a))
 checkOneSideIdent (Equation{..}) = if union inp' outp' == intersect inp' outp' then
     Right $ Equation{..}
     else
@@ -865,35 +874,23 @@ checkOneSideIdent (Equation{..}) = if union inp' outp' == intersect inp' outp' t
         f "..." = "\226\128\166"
         f x = x
 
-checkDuplDim :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkDuplDim :: (Eq a,Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString (Equation (Axis a))
 checkDuplDim eqn@(Equation{..}) = if flatten inp == flatten (remDupl' inp) && flatten outp == flatten (remDupl' outp)
     then
     Right $ Equation{..}
     else
     let
-        ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) :: Axis
+        ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp)))
         dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
 
-checkRightDuplDim :: Equation Axis -> Either BS.ByteString (Equation Axis)
+checkRightDuplDim :: (Eq a,Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString (Equation (Axis a))
 checkRightDuplDim eqn@(Equation{..}) = if flatten outp == flatten (remDupl' outp)
     then
     Right eqn
     else
     let
-        ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp))) :: Axis
+        ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp)))
         dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
-
-checkLeftAxisUnused :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkLeftAxisUnused eqn@(Equation{..}) =
-    case find (`notElem` flatten inp) (map fst axesLengths) of
-        Just x -> Left $ "Axis " <> BS.pack (show x) <> " is not used in transform"
-        Nothing -> Right eqn
-
-checkRightAxisUnused :: Equation Axis -> Either BS.ByteString (Equation Axis)
-checkRightAxisUnused eqn@(Equation{..}) =
-    case find (`notElem` flatten outp) (map fst axesLengths) of
-        Just x -> Left $ "Axis " <> BS.pack (show x) <> " is not used in transform"
-        Nothing -> Right eqn
 
 findError :: ClientError -> BS.ByteString
 findError (UnsupportedContentType req resp@Response{..}) = responseBody
@@ -983,6 +980,18 @@ main = do
                 , outp = [Single (axis "W"), Single (axis "C"), Single (axis "H")]
                 , axesLengths = [(axis "C", 2)]
                 })
+        it "calculates elementary axes lengths for anonymous axis" $
+            elementaryAxesLengths' (Equation {
+                inp = [Single (Axis Nothing), Single (axis "H")]
+                , outp = [Single (axis "H")]
+                , axesLengths = []
+                })
+            `shouldBe`
+            rearrangeElementaryAxesLengthsPy (Equation {
+                inp = [Single (Axis Nothing), Single (axis "H")]
+                , outp = [Single (axis "H")]
+                , axesLengths = []
+                })
 
     hspec $ do
         it "calculates input composite axes" $
@@ -1009,6 +1018,18 @@ main = do
                 , outp = [Single (axis "W"), Single (axis "H")]
                 , axesLengths = [(axis "W", 2)]
                 })
+        -- it "calculates input composite axes for anonymous axis" $
+        --     inputCompositeAxes' (Equation {
+        --         inp = [Multiple [axis "W", axis "C"], Single (Axis Nothing)]
+        --         , outp = [Single (axis "W"), Single (axis "C"), Single (Axis Nothing)]
+        --         , axesLengths = [(axis "C", 2)]
+        --         })
+        --     `shouldBe`
+        --     rearrangeInputCompositeAxesPy (Equation {
+        --         inp = [Multiple [axis "W", axis "C"], Single (Axis Nothing)]
+        --         , outp = [Single (axis "W"), Single (axis "C"), Single (Axis Nothing)]
+        --         , axesLengths = [(axis "C", 2)]
+        --         })
     hspec $ do
         it "calculates reduced elementary axes" $
             reducedElementaryAxes' (Equation {
@@ -1185,6 +1206,19 @@ main = do
             , Transpose [0, 1, 2]
             , Reshape [16, 3]
             ]
+        -- it "generates tf commands for anonymous axis" $
+        --     applyRecipe (1 : tail sampleShape) (Equation {
+        --         inp = [Single (Axis Nothing), Single (axis "W"), Single (axis "C")]
+        --         , outp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
+        --         , axesLengths = []
+        --         })
+        --     `shouldBe`
+        --     [
+        --     Reshape [4, 4, 3]
+        --     , Transpose [0, 1, 2]
+        --     , Reshape [4, 4, 3]
+        --     ]
+
 
 
 
@@ -1204,7 +1238,7 @@ main = do
 
 
 
-    -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation Axis)
+    -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation (Axis a))
     -- print $ ellipsisPositionInLhs [B, Ellipsis, H]
     -- print $ ellipsisPositionInLhs [B, H]
     -- print $ inputCompositeAxes S.empty $ fmap (fmap fromEnum) [Single B, Single H]
