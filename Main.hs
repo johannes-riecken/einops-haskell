@@ -36,7 +36,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map(..))
 import qualified Data.Map as M
-import Data.Maybe hiding (mapMaybe)
+import Data.Maybe hiding (mapMaybe, catMaybes)
 import Data.Proxy
 -- import qualified Data.Sequence as S
 import Data.Set (Set(..))
@@ -71,7 +71,7 @@ instance Show TfCommand where
     show (Transpose xs) = printf "x = tf.transpose(x, %s)" (show xs)
     show (ExpandDims x) = printf "x = tf.expand_dims(x, %d)" x
 
-newtype Axis a = Axis { getAxis :: Maybe a } deriving (Arbitrary,Functor,Applicative,Monad,Foldable,Traversable)
+newtype Axis a = Axis { getAxis :: Maybe a } deriving (Arbitrary,Functor,Applicative,Monad,Foldable,Traversable,Filterable)
 
 axis :: String -> Axis String
 axis x = Axis (Just x)
@@ -679,19 +679,18 @@ repeatFinalShapesPy xs = either (Left . findError) Right . unsafePerformIO $ do
 intersectCompLists :: Ord a => [Composite a] -> [Composite a] -> [Composite a]
 intersectCompLists xs ys = uncc $ mapMaybe (\x -> if x `elem` cc ys then Just x else Nothing) (cc xs)
 
-axisNumsFromCompList :: Ord a => [Composite (Axis a)] -> M.Map (Axis a) Int
+axisNumsFromCompList :: Ord a => [Composite (Axis a)] -> M.Map a Int
 axisNumsFromCompList = snd . foldl' (\(i,acc) x ->
-        if x == Axis Nothing then (i,acc) else
         if M.member x acc then (i,acc) else
         (i+1,M.insertWith (\a b -> error "no duplicates allowed") x i acc))
-        (0,M.empty) . cc
+        (0,M.empty) . ccc
 
 -- axesPermutation gives the numbers of flatten output axes
 axesPermutation :: Ord a => Equation (Axis a) -> [Int]
 axesPermutation (Equation{..}) = let
     axisNums = axisNumsFromCompList (intersectCompLists inp outp)
     in
-    foldr ((:) . (axisNums M.!)) [] . cc $ outp
+    foldr ((:) . (axisNums M.!)) [] . ccc $ outp
 
 -- addedAxes given equation returns a map from axes numbers to repeat counts
 -- Example: addedAxes "h w -> h w 3" is {2: 3}
@@ -699,18 +698,26 @@ axesPermutation (Equation{..}) = let
 addedAxes :: Equation (Axis a) -> AddedAxesRet
 addedAxes _ = []  -- TODO: implement
 
+catMaybes' :: [Axis a] -> [a]
+catMaybes' = mapMaybe getAxis
+
 -- example: reducedElementaryAxes "h w -> h" "max" is [1]
+-- TODO: fuse
 reducedElementaryAxes :: Ord a => Equation (Axis a) -> ReducedElementaryAxesRet
 reducedElementaryAxes (Equation{..}) = let
     axisNums = axisNumsFromCompList inp
+    catMaybes' :: [Axis a] -> [a]
+    catMaybes' = mapMaybe getAxis
+    flatten' = catMaybes' . flatten
     in
-    map (axisNums M.!) $ flatten inp \\ flatten outp
+    map (axisNums M.!) $ flatten' inp \\ flatten' outp
 
+-- TODO: fuse
 outputCompositeAxes :: Ord a => Equation (Axis a) -> OutputCompositeAxesRet
 outputCompositeAxes eqn@(Equation{..}) = let
     axisNums = axisNumsFromCompList inp
     in
-    map (F.toList . fmap (axisNums M.!)) outp
+    map (F.toList . fmap (axisNums M.!) . cci) outp
 
 elementaryAxesLengths :: Ord a => Equation (Axis a) -> ElementaryAxesLengthsRet
 elementaryAxesLengths eqn@Equation{..} = let m = M.fromList axesLengths in
@@ -727,20 +734,23 @@ inputCompositeAxes :: Ord a => Equation (Axis a) -> [([Int],[Int])]
 inputCompositeAxes eqn@Equation{..} =
     let
         axisNums = axisNumsFromCompList inp
-        known = S.fromList (fmap ((axisNums M.!) . fst) axesLengths)
+        known = S.fromList . foldr ((:) . (axisNums M.!)) [] . cla . fmap fst $ axesLengths
         in map (
-            foldr (select (`S.member` known) . (axisNums M.!)) ([],[])
+            foldr (select (`S.member` known) . (axisNums M.!)) ([],[]) . cci
             ) inp
 
 -- TODO: fuse
 -- TODO: allow deeper nesting of Composite
-initMap :: Ord a => Equation (Axis a) -> [Int] -> Map (Axis a) Int
+initMap :: Ord a => Equation (Axis a) -> [Int] -> Map a Int
 initMap eqn@Equation{..} shape =
     let
+    -- sizes :: M.Map a Int
     sizes = M.fromList . snd $ foldr (\x' (i,acc) -> case x' of
-            Single x -> (i-1,(x, shape !! i):acc)
-            Multiple xs -> (i-1,handleMultiple i xs ++ acc)
+            Single (Axis (Just x)) -> (i-1,(x, shape !! i):acc)
+            Single (Axis Nothing) -> (i-1,acc)
+            Multiple xs -> (i-1,handleMultiple i (catMaybes' xs) ++ acc)
             ) (length inp - 1,[]) inp
+    -- handleMultiple :: Int -> [a] ->
     handleMultiple i xs = map (\x -> if x `M.member` axesLengthsMap then
         (x,axesLengthsMap M.! x)
         else
@@ -748,7 +758,7 @@ initMap eqn@Equation{..} shape =
         ) xs
         where
             prod = product . map (axesLengthsMap M.!) . filter (`M.member` axesLengthsMap)
-    axesLengthsMap = M.fromList axesLengths
+    axesLengthsMap = M.fromList . map (first (fromJust . getAxis)) . filter (isJust . getAxis . fst) $ axesLengths
     in sizes
 
 initShapes :: Ord a => Equation (Axis a) -> InitShapesRet
@@ -756,7 +766,7 @@ initShapes = initShapesWithShape sampleShape
 
 -- TODO: fuse
 initShapesWithShape :: Ord a => [Int] -> Equation (Axis a) -> InitShapesRet
-initShapesWithShape shape eqn@Equation{..} = map (initMap eqn shape M.!) (flatten inp)
+initShapesWithShape shape eqn@Equation{..} = foldr ((:) . (initMap eqn shape M.!)) [] . ccc $ inp
 
 -- TODO: remove
 reducedAxes :: Ord a => Equation (Axis a) -> ReducedAxesRet
@@ -776,7 +786,7 @@ finalShapes = finalShapesWithShape sampleShape
 -- TODO: allow deeper nesting
 -- TODO: fuse
 finalShapesWithShape :: Ord a => [Int] -> Equation (Axis a) -> FinalShapesRet
-finalShapesWithShape shape eqn@Equation{..} = map (foldr ((*) . (initMap eqn shape M.!)) 1) outp
+finalShapesWithShape shape eqn@Equation{..} = foldr ((:) . foldr ((*) . (initMap eqn shape M.!)) 1 . cci) [] $ outp
 -- end of reconstruct
 
 -- TODO: Generalize reduction type
@@ -832,6 +842,20 @@ newtype CCC a = CCC (Compose (Compose [] Composite) Axis a) deriving (Functor, F
 
 ccc :: [Composite (Axis a)] -> CCC a
 ccc = CCC . Compose . Compose
+
+-- inner composition
+newtype CCI a = CCI (Compose Composite Axis a) deriving (Functor, Foldable, Traversable, Applicative)
+cci :: Composite (Axis a) -> CCI a
+cci = CCI . Compose
+
+uncci (CCI (Compose x)) = x
+
+-- list of axes
+newtype CLA a = CLA (Compose [] Axis a) deriving (Functor, Foldable, Traversable, Applicative)
+cla :: [Axis a] -> CLA a
+cla = CLA . Compose
+
+uncla (CLA (Compose x)) = x
 
 instance Filterable CC where
    mapMaybe _ (CC (Compose []))     = CC (Compose [])
@@ -1207,18 +1231,18 @@ main = do
             , Transpose [0, 1, 2]
             , Reshape [16, 3]
             ]
-        -- it "generates tf commands for anonymous axis" $
-        --     applyRecipe (1 : tail sampleShape) (Equation {
-        --         inp = [Single (Axis Nothing), Single (axis "W"), Single (axis "C")]
-        --         , outp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
-        --         , axesLengths = []
-        --         })
-        --     `shouldBe`
-        --     [
-        --     Reshape [4, 4, 3]
-        --     , Transpose [0, 1, 2]
-        --     , Reshape [4, 4, 3]
-        --     ]
+        it "generates tf commands for anonymous axis" $
+            applyRecipe (1 : tail sampleShape) (Equation {
+                inp = [Single anon, Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , axesLengths = []
+                })
+            `shouldBe`
+            [
+            Reshape [4, 4, 3]
+            , Transpose [0, 1, 2]
+            , Reshape [4, 4, 3]
+            ]
 
 
 
