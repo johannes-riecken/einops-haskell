@@ -744,13 +744,11 @@ inputCompositeAxes eqn@Equation{..} =
 initMap :: Ord a => Equation (Axis a) -> [Int] -> Map a Int
 initMap eqn@Equation{..} shape =
     let
-    -- sizes :: M.Map a Int
     sizes = M.fromList . snd $ foldr (\x' (i,acc) -> case x' of
             Single (Axis (Just x)) -> (i-1,(x, shape !! i):acc)
             Single (Axis Nothing) -> (i-1,acc)
             Multiple xs -> (i-1,handleMultiple i (catMaybes' xs) ++ acc)
             ) (length inp - 1,[]) inp
-    -- handleMultiple :: Int -> [a] ->
     handleMultiple i xs = map (\x -> if x `M.member` axesLengthsMap then
         (x,axesLengthsMap M.! x)
         else
@@ -786,19 +784,19 @@ finalShapes = finalShapesWithShape sampleShape
 -- TODO: allow deeper nesting
 -- TODO: fuse
 finalShapesWithShape :: Ord a => [Int] -> Equation (Axis a) -> FinalShapesRet
-finalShapesWithShape shape eqn@Equation{..} = foldr ((:) . foldr ((*) . (initMap eqn shape M.!)) 1 . cci) [] $ outp
+finalShapesWithShape shape eqn@Equation{..} = foldr ((:) . foldr ((*) . (initMap eqn shape M.!)) 1 . cci) [] outp
 -- end of reconstruct
 
 -- TODO: Generalize reduction type
-applyRecipe :: Ord a => [Int] -> Equation (Axis a) -> [TfCommand]
-applyRecipe shape eqn@Equation{..} = let
+applyRecipe :: Ord a => [Int] -> Equation (Axis a) -> Maybe String -> [TfCommand]
+applyRecipe shape eqn@Equation{..} reductionName = let
     x = initShapesWithShape shape eqn
     y = reducedAxes eqn
     z = axesReordering eqn
     w = addedAxesReconstruct eqn
     v = finalShapesWithShape shape eqn
     reshapeCmd = Reshape x
-    reduceCmds = if null y then [] else getReduceCmds "max" y
+    reduceCmds = if null y then [] else getReduceCmds (fromJust reductionName) y
     transposeCmd = Transpose z
     addAxisCmds = getAddAxisCmds (length z + length w) w
     finalReshapeCmd = Reshape v
@@ -1175,7 +1173,7 @@ main = do
                 inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , outp = [Single (axis "H"), Multiple [axis "B", axis "W"], Single (axis "C")]
                 , axesLengths = []
-                })
+                }) Nothing
             `shouldBe`
             [
             Reshape [6,4,4,3] -- TODO: remove redundant command
@@ -1187,7 +1185,7 @@ main = do
                 inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , outp = [Single (axis "B"), Single (axis "C")]
                 , axesLengths = []
-                })
+                }) (Just "max")
             `shouldBe`
             [
             Reshape [6, 4, 4, 3]
@@ -1200,7 +1198,7 @@ main = do
                 inp = [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , outp = [Multiple [axis "B", axis "H", axis "W", axis "C"]]
                 , axesLengths = []
-                })
+                }) Nothing
             `shouldBe`
             [
             Reshape [6, 4, 4, 3]
@@ -1212,7 +1210,7 @@ main = do
                 inp = [Single (axis "B"), Single (axis "H"), Multiple [axis "I", axis "W"], Single (axis "C")]
                 , outp = [Single (axis "I"), Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = [(axis "I",2)]
-                })
+                }) Nothing
             `shouldBe`
             [
             Reshape [6, 4, 2, 2, 3]
@@ -1224,7 +1222,7 @@ main = do
                 inp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , outp = [Multiple [axis "H", axis "W"], Single (axis "C")]
                 , axesLengths = []
-                })
+                }) Nothing
             `shouldBe`
             [
             Reshape [4, 4, 3]
@@ -1236,7 +1234,7 @@ main = do
                 inp = [Single anon, Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , outp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
-                })
+                }) Nothing
             `shouldBe`
             [
             Reshape [4, 4, 3]
