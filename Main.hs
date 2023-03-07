@@ -24,7 +24,7 @@ import qualified Data.ByteString.Lazy.Char8 as BS
 import Data.Either (isRight, fromRight)
 import Data.Either.Extra (eitherToMaybe)
 import qualified Data.Foldable as F
-import Data.Tensor hiding (select)
+-- import Data.Tensor hiding (select)
 import Data.Function.Pointless
 import Data.Functor.Classes
 import Data.Functor.Compose
@@ -41,6 +41,7 @@ import Data.Proxy
 -- import qualified Data.Sequence as S
 import Data.Set (Set(..))
 import qualified Data.Set as S
+import Data.Tuple (swap)
 import Debug.Trace
 import GHC.Generics
 import GHC.TypeLits
@@ -749,14 +750,12 @@ initMap eqn@Equation{..} shape =
             Single (Axis Nothing) -> (i-1,acc)
             Multiple xs -> (i-1,handleMultiple i (catMaybes' xs) ++ acc)
             ) (length inp - 1,[]) inp
-    handleMultiple i xs = map (\x -> if x `M.member` axesLengthsMap then
-        (x,axesLengthsMap M.! x)
-        else
-        (x,shape !! i `div` prod xs)
+    handleMultiple i xs = map (\x ->
+        (x,fromJust $ (axesLengthsMap M.!? x) <|> Just (shape !! i `div` prod xs))
         ) xs
         where
-            prod = product . map (axesLengthsMap M.!) . filter (`M.member` axesLengthsMap)
-    axesLengthsMap = M.fromList . map (first (fromJust . getAxis)) . filter (isJust . getAxis . fst) $ axesLengths
+            prod = foldr ((*) . (\k -> M.findWithDefault 1 k axesLengthsMap)) 1
+    axesLengthsMap = M.fromList . map swap . mapMaybe (sequenceA . swap . first getAxis) $ axesLengths
     in sizes
 
 initShapes :: Ord a => Equation (Axis a) -> InitShapesRet
