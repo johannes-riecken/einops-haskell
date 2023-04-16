@@ -1,0 +1,63 @@
+rearrange i j -> j i
+axes_permutation = [1, 0]
+elementary_axes_lengths = [None, None]
+ellipsis_position_in_lhs = None
+input_composite_axes = [([], [0]), ([], [1])]
+output_composite_axes = [[1], [0]]
+reduced_elementary_axes = []
+
+reduce i j -> i sum
+axes_permutation = [0]
+elementary_axes_lengths = [None, None]
+ellipsis_position_in_lhs = None
+input_composite_axes = [([], [0]), ([], [1])]
+output_composite_axes = [[0]]
+reduced_elementary_axes = [1]
+
+i j -> (i j)
+axes_permutation = [0, 1]
+elementary_axes_lengths = [None, None]
+ellipsis_position_in_lhs = None
+input_composite_axes = [([], [0]), ([], [1])]
+output_composite_axes = [[0, 1]]
+reduced_elementary_axes = []
+
+... i -> i ...
+axes_permutation = [1, 0]
+elementary_axes_lengths = [None, None]
+ellipsis_position_in_lhs = 0
+input_composite_axes = [([], [0]), ([], [1])]
+output_composite_axes = [[1], [None]]
+reduced_elementary_axes = []
+
+(i0 i1) j -> (i0 i1 j)
+axes_permutation = [0, 1, 2]
+elementary_axes_lengths = [None, 2, None]
+ellipsis_position_in_lhs = None
+input_composite_axes = [([1], [0]), ([], [2])]
+output_composite_axes = [[0, 1, 2]]
+reduced_elementary_axes = []
+
+(i0 i1) j -> i0 i1 j
+axes_permutation = [0, 1, 2]
+elementary_axes_lengths = [None, 2, None]
+ellipsis_position_in_lhs = None
+input_composite_axes = [([1], [0]), ([], [2])]
+output_composite_axes = [[0], [1], [2]]
+reduced_elementary_axes = []
+
+i j -> i j ()
+axes_permutation = [0, 1]
+elementary_axes_lengths = [None, None]
+ellipsis_position_in_lhs = None
+input_composite_axes = [([], [0]), ([], [1])]
+output_composite_axes = [[0], [1], []]
+reduced_elementary_axes = []
+
+i j () -> i j
+axes_permutation = [0, 1]
+elementary_axes_lengths = [None, None]
+ellipsis_position_in_lhs = None
+input_composite_axes = [([], [0]), ([], [1]), ([], [])]
+output_composite_axes = [[0], [1]]
+reduced_elementary_axes = []
