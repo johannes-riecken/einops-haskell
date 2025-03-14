@@ -1,0 +1,4 @@
+lens
+hspec
+servant
+http-client
