@@ -14,10 +14,7 @@
 import Control.Applicative
 import Control.Applicative.Lift
 import Control.Arrow
-import Control.Monad
-import Control.Monad.Trans.State
 import Data.Aeson hiding ((.:))
-import qualified Data.ByteString.Lazy.Char8 as BS
 import qualified Data.Foldable as F
 -- import Data.Tensor hiding (select)
 import Data.Functor.Compose
@@ -25,7 +22,6 @@ import Data.List
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe hiding (mapMaybe, catMaybes)
-import qualified Data.Set as S
 import Data.Tuple (swap)
 import GHC.Generics
 import Iso.Deriving
@@ -34,6 +30,7 @@ import Test.QuickCheck
 import Text.Printf
 import Witherable hiding (filter)
 
+sampleShape :: [Int]
 sampleShape = [6,4,4,3]
 
 data TfCommand =
@@ -83,11 +80,6 @@ instance Isomorphic (Lift [] a) (Composite a)
 
 deriving via As1 (Lift []) Composite instance Applicative Composite
 
-instance (Monad m, Monad n, Traversable n) => Monad (Compose m n) where
-  ma >>= f = join_ (fmap f ma)
-    where join_ = Compose . fmap join . (sequence <=< (getCompose . fmap getCompose))
-
-
 instance Arbitrary a => Arbitrary (Composite a) where
     arbitrary = oneof [Single <$> arbitrary, Multiple <$> arbitrary]
     shrink = genericShrink
@@ -125,11 +117,6 @@ instance ToJSON a => ToJSON (Equation a)
 flatten :: [Composite a] -> [a]
 flatten = (=<<) F.toList
 
-type AxesPermutationRet = [Int]
-type AddedAxesRet = [Int]
-type OutputCompositeAxesRet = [[Int]]
-type ElementaryAxesLengthsRet = [Maybe Int]
-type InputCompositeAxesRet = [([Int], [Int])]
 type ReducedElementaryAxesRet = [Int]
 
 type InitShapesRet = [Int]
@@ -144,7 +131,7 @@ intersectCompLists xs ys = uncc $ mapMaybe (\x -> if x `elem` cc ys then Just x 
 axisNumsFromCompList :: Ord a => [Composite (Axis a)] -> M.Map a Int
 axisNumsFromCompList = snd . foldl' (\(i,acc) x ->
         if M.member x acc then (i,acc) else
-        (i+1,M.insertWith (\a b -> error "no duplicates allowed") x i acc))
+        (i+1,M.insertWith (\_ _ -> error "no duplicates allowed") x i acc))
         (0,M.empty) . ccc
 
 -- axesPermutation gives the numbers of flatten output axes
@@ -154,12 +141,6 @@ axesPermutation (Equation{..}) = let
     in
     foldr ((:) . (axisNums M.!)) [] . ccc $ outp
 
--- addedAxes given equation returns a map from axes numbers to repeat counts
--- Example: addedAxes "h w -> h w 3" is {2: 3}
--- TODO: Add integer type to Axis datatype
-addedAxes :: Equation (Axis a) -> AddedAxesRet
-addedAxes _ = []  -- TODO: implement
-
 catMaybes' :: [Axis a] -> [a]
 catMaybes' = mapMaybe getAxis
 
@@ -168,8 +149,6 @@ catMaybes' = mapMaybe getAxis
 reducedElementaryAxes :: Ord a => Equation (Axis a) -> ReducedElementaryAxesRet
 reducedElementaryAxes (Equation{..}) = let
     axisNums = axisNumsFromCompList inp
-    catMaybes' :: [Axis a] -> [a]
-    catMaybes' = mapMaybe getAxis
     flatten' = catMaybes' . flatten
     in
     map (axisNums M.!) $ flatten' inp \\ flatten' outp
@@ -177,7 +156,7 @@ reducedElementaryAxes (Equation{..}) = let
 -- TODO: fuse
 -- TODO: allow deeper nesting of Composite
 initMap :: Ord a => Equation (Axis a) -> [Int] -> Map a Int
-initMap eqn@Equation{..} shape =
+initMap Equation{..} shape =
     let
     sizes = M.fromList . snd $ foldr (\x' (i,acc) -> case x' of
             Single (Axis (Just x)) -> (i-1,(x, shape !! i):acc)
@@ -216,7 +195,7 @@ finalShapesWithShape shape eqn@Equation{..} = foldr ((:) . foldr ((*) . (initMap
 
 -- TODO: Generalize reduction type
 applyRecipe :: Ord a => [Int] -> Equation (Axis a) -> Maybe String -> [TfCommand]
-applyRecipe shape eqn@Equation{..} reductionName = let
+applyRecipe shape eqn reductionName = let
     x = initShapesWithShape shape eqn
     y = reducedAxes eqn
     z = axesReordering eqn
@@ -291,48 +270,6 @@ instance Filterable CC where
 
 instance Witherable CC
 
-remDupl :: (Show a,Ord a,Witherable t) => t a -> t a
-remDupl = (`evalState` S.empty) . wither (\a -> state (\s -> (mfilter (not . (`S.member` s)) (Just a),S.insert a s)))
-
-remDupl' :: (Show a,Ord a) => [Composite (Axis a)] -> [Composite (Axis a)]
-remDupl' = uncc . remDupl . cc
-
--- TODO: check this if operation is rearrange
--- TODO: cover
--- checkOneSideIdent :: (Show (f a),Eq (f a),Foldable f) => Equation (f a) -> Either String (Equation (f a))
-checkOneSideIdent :: (Eq a,Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString (Equation (Axis a))
-checkOneSideIdent (Equation{..}) = if union inp' outp' == intersect inp' outp' then
-    Right $ Equation{..}
-    else
-    Left $ "Identifiers only on one side of expression (should be on both): " <> fmt (sort oneSiders)
-    where
-        inp' = flatten inp
-        outp' = flatten outp
-        fmt = (\x -> "{" <> x <> "}") . BS.intercalate ", " . map (\x -> "'" <> BS.pack (f $ show x) <> "'")
-        oneSiders = if not . null $ inp' \\ outp' then inp' \\ outp' else outp' \\ inp'
-        f "..." = "\226\128\166"
-        f x = x
-
--- TODO: cover
-checkDuplDim :: (Eq a,Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString (Equation (Axis a))
-checkDuplDim eqn@(Equation{..}) = if flatten inp == flatten (remDupl' inp) && flatten outp == flatten (remDupl' outp)
-    then
-    Right $ Equation{..}
-    else
-    let
-        ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp)))
-        dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
-
--- TODO: cover
-checkRightDuplDim :: (Eq a,Ord a,Show a) => Equation (Axis a) -> Either BS.ByteString (Equation (Axis a))
-checkRightDuplDim eqn@(Equation{..}) = if flatten outp == flatten (remDupl' outp)
-    then
-    Right eqn
-    else
-    let
-        ys = head ((flatten inp \\ flatten (remDupl' inp)) ++ (flatten outp \\ flatten (remDupl' outp)))
-        dup = BS.pack . show $ ys in Left $ "Indexing expression contains duplicate dimension \"" <> dup <> "\""
-
 main :: IO ()
 main = do
     hspec $ do
@@ -386,7 +323,7 @@ main = do
             , Reshape [2, 6, 4, 2, 3]
             ]
         it "generates tf commands for different shape" $
-            applyRecipe (tail sampleShape) (Equation {
+            applyRecipe (drop 1 sampleShape) (Equation {
                 inp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , outp = [Multiple [axis "H", axis "W"], Single (axis "C")]
                 , axesLengths = []
@@ -398,7 +335,7 @@ main = do
             , Reshape [16, 3]
             ]
         it "generates tf commands for anonymous axis" $
-            applyRecipe (1 : tail sampleShape) (Equation {
+            applyRecipe (1 : drop 1 sampleShape) (Equation {
                 inp = [Single anon, Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , outp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , axesLengths = []
