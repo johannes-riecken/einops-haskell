@@ -120,9 +120,6 @@ flatten = (=<<) F.toList
 type ReducedElementaryAxesRet = [Int]
 
 type InitShapesRet = [Int]
-type ReducedAxesRet = [Int]
-type AxesReorderingRet = [Int]
-type AddedAxesReconstructRet = Map Int Int
 type FinalShapesRet = [Int]
 
 intersectCompLists :: Ord a => [Composite a] -> [Composite a] -> [Composite a]
@@ -130,13 +127,13 @@ intersectCompLists xs ys = uncc $ mapMaybe (\x -> if x `elem` cc ys then Just x 
 
 axisNumsFromCompList :: Ord a => [Composite (Axis a)] -> M.Map a Int
 axisNumsFromCompList = snd . foldl' (\(i,acc) x ->
-        if M.member x acc then (i,acc) else
         (i+1,M.insertWith (\_ _ -> error "no duplicates allowed") x i acc))
         (0,M.empty) . ccc
 
--- axesPermutation gives the numbers of flatten output axes
+-- axesPermutation gives the numbers of flattened output axes
 axesPermutation :: Ord a => Equation (Axis a) -> [Int]
 axesPermutation (Equation{..}) = let
+    -- intersectCompList is necessary for the correct number ordering here
     axisNums = axisNumsFromCompList (intersectCompLists inp outp)
     in
     foldr ((:) . (axisNums M.!)) [] . ccc $ outp
@@ -175,18 +172,6 @@ initMap Equation{..} shape =
 initShapesWithShape :: Ord a => [Int] -> Equation (Axis a) -> InitShapesRet
 initShapesWithShape shape eqn@Equation{..} = foldr ((:) . (initMap eqn shape M.!)) [] . ccc $ inp
 
--- TODO: remove
-reducedAxes :: Ord a => Equation (Axis a) -> ReducedAxesRet
-reducedAxes = reducedElementaryAxes
-
--- TODO: remove
-axesReordering :: Ord a => Equation (Axis a) -> AxesReorderingRet
-axesReordering = axesPermutation
-
--- TODO: implement
-addedAxesReconstruct :: Equation (Axis a) -> AddedAxesReconstructRet
-addedAxesReconstruct _ = M.empty
-
 -- TODO: allow deeper nesting
 -- TODO: fuse
 finalShapesWithShape :: Ord a => [Int] -> Equation (Axis a) -> FinalShapesRet
@@ -197,21 +182,15 @@ finalShapesWithShape shape eqn@Equation{..} = foldr ((:) . foldr ((*) . (initMap
 applyRecipe :: Ord a => [Int] -> Equation (Axis a) -> Maybe String -> [TfCommand]
 applyRecipe shape eqn reductionName = let
     x = initShapesWithShape shape eqn
-    y = reducedAxes eqn
-    z = axesReordering eqn
-    w = addedAxesReconstruct eqn
+    y = reducedElementaryAxes eqn
+    z = axesPermutation eqn
     v = finalShapesWithShape shape eqn
     reshapeCmd = Reshape x
     reduceCmds = if null y then [] else getReduceCmds (fromJust reductionName) y
     transposeCmd = Transpose z
-    addAxisCmds = getAddAxisCmds (length z + length w) w
     finalReshapeCmd = Reshape v
     in
-    [reshapeCmd] ++ reduceCmds ++ [transposeCmd] ++ addAxisCmds ++ [finalReshapeCmd]
-
--- TODO: Implement
-getAddAxisCmds :: Int -> Map Int Int -> [TfCommand]
-getAddAxisCmds _ _ = []
+    [reshapeCmd] ++ reduceCmds ++ [transposeCmd] ++ [finalReshapeCmd]
 
 -- TODO: Implement
 getReduceCmds :: String -> [Int] -> [TfCommand]
