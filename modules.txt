@@ -1,3 +1,4 @@
+indexed-traversable
 lens
 hspec
 servant
