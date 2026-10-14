@@ -153,7 +153,7 @@ instance Keyed f => Keyed (CompList f) where
 
 data Equation g a = Equation {
     inp :: CompList g a
-    , outp :: [Composite g a]
+    , outp :: CompList g a
     , axisLengths :: [(g a, Int)]
     } deriving (Show, Generic)
 
@@ -161,7 +161,7 @@ instance (Arbitrary (g a)) => Arbitrary (Equation g a) where
     arbitrary = do
         inp <- arbitrary
         n <- choose (0,10)
-        outp <- take n <$> shuffle (getCompList inp)
+        outp <- MkCompList . take n <$> shuffle (getCompList inp)
         axisLengths <- arbitrary
         pure $ Equation{..}
     shrink = genericShrink
@@ -175,14 +175,9 @@ cc :: [Composite f a] -> CC f a
 cc = CC . Compose
 
 axisNumsFromCompList :: (Ord a, Foldable f) => CompList f a -> M.Map a Int
-axisNumsFromCompList = snd . foldl' (\(i,acc) x ->
-        (i+1,M.insertWith (\_ _ -> error "no duplicates allowed") x i acc))
-        (0,M.empty)
+axisNumsFromCompList = M.fromList . (`zip` [0..]) . F.toList
 
 deriving instance Filterable f => Filterable (CC f)
-
--- list of axes
-newtype CLA a = CLA (Compose [] Axis a) deriving (Functor, Foldable, Traversable, Applicative)
 
 intersectCompLists :: (Ord a, Filterable f, Foldable f) => CompList f a -> CompList f a -> CompList f a
 intersectCompLists xs ys = mapMaybe (\x -> if x `elem` ys then Just x else Nothing) (xs)
@@ -191,20 +186,23 @@ intersectCompLists xs ys = mapMaybe (\x -> if x `elem` ys then Just x else Nothi
 axesPermutation :: Ord a => Equation Axis a -> [Int]
 axesPermutation (Equation{..}) = let
     -- intersectCompList is necessary for the correct number ordering here
-    axisNums = axisNumsFromCompList (intersectCompLists inp (MkCompList outp))
+    axisNums = axisNumsFromCompList (intersectCompLists inp (outp))
     in
-    foldr ((:) . (axisNums M.!)) [] . cc $ outp
+    foldr ((:) . (axisNums M.!)) [] $ outp
 
 -- example: reducedElementaryAxes "h w -> h" "max" is [1]
--- TODO: fuse
 reducedElementaryAxes :: forall a. Ord a => Equation Axis a -> [Int]
 reducedElementaryAxes (Equation{..}) = let
     axisNums :: M.Map (a) Int
     axisNums = axisNumsFromCompList inp
-    diff = F.toList inp \\ F.toList (MkCompList outp) :: [(a)]
+    diff = F.toList inp \\ F.toList (outp) :: [(a)]
     in
     map (axisNums M.!) diff
 
+-- inferAxisLengths returns the lengths for all axis names, where a Multiple
+-- axis may have at most one unknown lengths, which is then the length from the
+-- corresponding shape item divided by all the known lengths of axes in the
+-- Multiple
 inferAxisLengths :: forall a. Ord a => Equation Axis a -> [Int] -> Map a Int
 inferAxisLengths Equation{..} shape =
     M.fromList . F.toList $ mapWithKey (\(i, mj, ()) nm -> case mj of
@@ -228,26 +226,9 @@ inferAxisLengths Equation{..} shape =
 initShapesWithShape :: Ord a => [Int] -> Equation Axis a -> [Int]
 initShapesWithShape shape eqn@Equation{..} = foldr ((:) . (inferAxisLengths eqn shape M.!)) [] $ inp
 
--- TODO: allow deeper nesting
--- TODO: fuse
 finalShapesWithShape :: Ord a => [Int] -> Equation Axis a -> [Int]
-finalShapesWithShape shape eqn@Equation{..} = foldr ((:) . foldr ((*) . (inferAxisLengths eqn shape M.!)) 1) [] outp
+finalShapesWithShape shape eqn@Equation{..} = foldr ((:) . foldr ((*) . (inferAxisLengths eqn shape M.!)) 1) [] . getCompList $ outp
 -- end of reconstruct
-
--- -- swizzleComposite :: Composite Axis (Identity a) -> Composite Identity (Axis a)
--- -- swizzleComposite (Single (Axis (Just (Identity x)))) = Single (Identity (Axis (Just x)))
--- -- swizzleComposite (Single (Axis Nothing)) = Single (Identity (Axis Nothing))
--- -- swizzleComposite (Multiple xs) = Multiple (map (\case
--- --     (Axis (Just (Identity x))) -> Identity (Axis (Just x))
--- --     (Axis Nothing) -> Identity (Axis Nothing)) xs
--- --     )
-
--- -- swizzle :: Equation Identity Axis a -> Equation Axis Identity a
--- -- swizzle eqn@Equation{..} = Equation {
--- --     inp = map swizzleComposite inp
--- --     , outp = map swizzleComposite outp
--- --     , axisLengths = [] -- sorry
--- --     }
 
 -- TODO: Implement
 getReduceCmds :: String -> [Int] -> [TfCommand]
@@ -267,21 +248,6 @@ applyRecipe shape eqn reductionName = let
     in
     [reshapeCmd] ++ reduceCmds ++ [transposeCmd] ++ [finalReshapeCmd]
 
--- -- -- --     if len(added_axes) > 0:
--- -- -- --         tensor = backend.add_axes(tensor, n_axes=len(axes_reordering) + len(added_axes), pos2len=added_axes)
-
--- -- -- -- def _apply_recipe(recipe: TransformRecipe, tensor: Tensor, reduction_type: Reduction) -> Tensor:
--- -- -- --     # this method works for all backends but not compilable with
--- -- -- --     backend = get_backend(tensor)
--- -- -- --     init_shapes, reduced_axes, axes_reordering, added_axes, final_shapes = \
--- -- -- --         _reconstruct_from_shape(recipe, backend.shape(tensor))
--- -- -- --     tensor = backend.reshape(tensor, init_shapes)
--- -- -- --     tensor = _reduce_axes(tensor, reduction_type=reduction_type, reduced_axes=reduced_axes, backend=backend)
--- -- -- --     tensor = backend.transpose(tensor, axes_reordering)
--- -- -- --     if len(added_axes) > 0:
--- -- -- --         tensor = backend.add_axes(tensor, n_axes=len(axes_reordering) + len(added_axes), pos2len=added_axes)
--- -- -- --     return backend.reshape(tensor, final_shapes)
-
 main :: IO ()
 main = do
     hspec $ do
@@ -292,7 +258,7 @@ main = do
         it "generates tf commands for rearrange" $
             applyRecipe sampleShape (Equation {
                 inp = MkCompList [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
-                , outp = [Single (axis "H"), Multiple [axis "B", axis "W"], Single (axis "C")]
+                , outp = MkCompList [Single (axis "H"), Multiple [axis "B", axis "W"], Single (axis "C")]
                 , axisLengths = []
                 }) Nothing
             `shouldBe`
@@ -304,7 +270,7 @@ main = do
         it "generates tf commands for reduce" $
             applyRecipe sampleShape (Equation {
                 inp = MkCompList [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
-                , outp = [Single (axis "B"), Single (axis "C")]
+                , outp = MkCompList [Single (axis "B"), Single (axis "C")]
                 , axisLengths = []
                 }) (Just "max")
             `shouldBe`
@@ -317,7 +283,7 @@ main = do
         it "generates tf commands for full reduce" $
             applyRecipe sampleShape (Equation {
                 inp = MkCompList [Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
-                , outp = [Multiple [axis "B", axis "H", axis "W", axis "C"]]
+                , outp = MkCompList [Multiple [axis "B", axis "H", axis "W", axis "C"]]
                 , axisLengths = []
                 }) Nothing
             `shouldBe`
@@ -329,7 +295,7 @@ main = do
         it "generates tf commands for split initial axis" $
             applyRecipe sampleShape (Equation {
                 inp = MkCompList [Single (axis "B"), Single (axis "H"), Multiple [axis "I", axis "W"], Single (axis "C")]
-                , outp = [Single (axis "I"), Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = MkCompList [Single (axis "I"), Single (axis "B"), Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , axisLengths = [(axis "I",2)]
                 }) Nothing
             `shouldBe`
@@ -341,7 +307,7 @@ main = do
         it "generates tf commands for different shape" $
             applyRecipe (drop 1 sampleShape) (Equation {
                 inp = MkCompList [Single (axis "H"), Single (axis "W"), Single (axis "C")]
-                , outp = [Multiple [axis "H", axis "W"], Single (axis "C")]
+                , outp = MkCompList [Multiple [axis "H", axis "W"], Single (axis "C")]
                 , axisLengths = []
                 }) Nothing
             `shouldBe`
@@ -353,7 +319,7 @@ main = do
         it "generates tf commands for anonymous axis" $
             applyRecipe (1 : drop 1 sampleShape) (Equation {
                 inp = MkCompList [Single anon, Single (axis "H"), Single (axis "W"), Single (axis "C")]
-                , outp = [Single (axis "H"), Single (axis "W"), Single (axis "C")]
+                , outp = MkCompList [Single (axis "H"), Single (axis "W"), Single (axis "C")]
                 , axisLengths = []
                 }) Nothing
             `shouldBe`
@@ -367,24 +333,24 @@ main = do
 
 
 
--- --     -- TODO: Support underscore axis
+-- -- --     -- TODO: Support underscore axis
 
--- --     -- PASS
--- --     -- quickCheck $ \xs -> axesPermutationPy xs === axesPermutation' xs
--- --     -- quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
--- --     -- quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
+-- -- --     -- PASS
+-- -- --     -- quickCheck $ \xs -> axesPermutationPy xs === axesPermutation' xs
+-- -- --     -- quickCheck $ \xs -> ellipsisPositionInLhsPy xs === ellipsisPositionInLhs' xs
+-- -- --     -- quickCheck $ \xs -> outputCompositeAxesPy xs === outputCompositeAxes' xs
 
--- --     -- print . elementaryAxesLengths' $ (Equation [] [] [(Ellipsis,0)])
--- --     -- quickCheck $ \xs -> collect (isRight (elementaryAxesLengths' xs)) $ eitherToMaybe (elementaryAxesLengthsPy xs) === eitherToMaybe (elementaryAxesLengths' xs)
+-- -- --     -- print . elementaryAxesLengths' $ (Equation [] [] [(Ellipsis,0)])
+-- -- --     -- quickCheck $ \xs -> collect (isRight (elementaryAxesLengths' xs)) $ eitherToMaybe (elementaryAxesLengthsPy xs) === eitherToMaybe (elementaryAxesLengths' xs)
 
--- --     -- let xs = Equation [] [Multiple [axis "Ellipsis"]] in
--- --     --     print $ ellipsisPositionInLhsPy xs
+-- -- --     -- let xs = Equation [] [Multiple [axis "Ellipsis"]] in
+-- -- --     --     print $ ellipsisPositionInLhsPy xs
 
 
 
--- --     -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation Axis a)
--- --     -- print $ ellipsisPositionInLhs [B, Ellipsis, H]
--- --     -- print $ ellipsisPositionInLhs [B, H]
--- --     -- print $ inputCompositeAxes S.empty $ fmap (fmap fromEnum) [Single B, Single H]
+-- -- --     -- print . axesPermutation' $ (Equation [] [Multiple []] :: Equation Axis a)
+-- -- --     -- print $ ellipsisPositionInLhs [B, Ellipsis, H]
+-- -- --     -- print $ ellipsisPositionInLhs [B, H]
+-- -- --     -- print $ inputCompositeAxes S.empty $ fmap (fmap fromEnum) [Single B, Single H]
 
--- --     pure ()
+-- -- --     pure ()
